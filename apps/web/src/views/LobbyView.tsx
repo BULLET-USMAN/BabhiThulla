@@ -8,6 +8,7 @@ import {
   Users,
   Sparkles,
   Link2,
+  Trophy,
 } from 'lucide-react';
 import {
   RoomParticipant,
@@ -19,6 +20,7 @@ import { StatusBadge } from '../components/ui/StatusBadge.js';
 import { useSettings } from '../context/SettingsContext.js';
 import { useToast } from '../context/ToastContext.js';
 import { useMultiplayer } from '../context/MultiplayerContext.js';
+import { RoomLeaderboardModal } from '../components/multiplayer/RoomLeaderboardModal.js';
 
 export function LobbyView() {
   const { roomCode: paramCode } = useParams<{ roomCode: string }>();
@@ -47,6 +49,7 @@ export function LobbyView() {
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [localReady, setLocalReady] = useState(true);
+  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
 
   // Navigate to multiplayer table when match starts
   useEffect(() => {
@@ -244,6 +247,14 @@ export function LobbyView() {
             >
               {copiedLink ? 'Link Copied!' : 'Copy Invite Link'}
             </Button>
+            <Button
+              variant="outline"
+              size="md"
+              onClick={() => setIsLeaderboardOpen(true)}
+              leftIcon={<Trophy className="w-4 h-4 text-gold-400" />}
+            >
+              Standings
+            </Button>
             <div className="flex items-center space-x-1 px-3 py-2 bg-charcoal-900 rounded-xl border border-charcoal-700 text-xs text-gray-300">
               <Users className="w-4 h-4 text-gold-400" />
               <span>
@@ -346,6 +357,13 @@ export function LobbyView() {
           </Button>
         </div>
       </div>
+
+      {/* Room Leaderboard Modal */}
+      <RoomLeaderboardModal
+        isOpen={isLeaderboardOpen}
+        onClose={() => setIsLeaderboardOpen(false)}
+        roomCode={activeRoomCode}
+      />
     </div>
   );
 }

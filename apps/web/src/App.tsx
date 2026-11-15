@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { SettingsProvider } from './context/SettingsContext.js';
 import { ToastProvider } from './context/ToastContext.js';
+import { GuestAuthProvider } from './context/GuestAuthContext.js';
 import { MultiplayerProvider } from './context/MultiplayerContext.js';
 import { Navbar } from './components/layout/Navbar.js';
 import { HomeView } from './views/HomeView.js';
@@ -10,6 +11,7 @@ import { LobbyView } from './views/LobbyView.js';
 import { GameTablePreviewView } from './views/GameTablePreviewView.js';
 import { PracticeGameView } from './views/PracticeGameView.js';
 import { MultiplayerGameView } from './views/MultiplayerGameView.js';
+import { StatisticsView } from './views/StatisticsView.js';
 import { HowToPlayView } from './views/HowToPlayView.js';
 import { SettingsView } from './views/SettingsView.js';
 import { NotFoundView } from './views/NotFoundView.js';
@@ -35,6 +37,7 @@ function AppLayout() {
           <Route path="/table" element={<GameTablePreviewView />} />
           <Route path="/practice" element={<PracticeGameView />} />
           <Route path="/multiplayer" element={<MultiplayerGameView />} />
+          <Route path="/stats" element={<StatisticsView />} />
           <Route path="/rules" element={<HowToPlayView />} />
           <Route path="/settings" element={<SettingsView />} />
           <Route path="*" element={<NotFoundView />} />
@@ -47,13 +50,15 @@ function AppLayout() {
 export function App() {
   return (
     <SettingsProvider>
-      <ToastProvider>
-        <MultiplayerProvider>
-          <BrowserRouter>
-            <AppLayout />
-          </BrowserRouter>
-        </MultiplayerProvider>
-      </ToastProvider>
+      <GuestAuthProvider>
+        <ToastProvider>
+          <MultiplayerProvider>
+            <BrowserRouter>
+              <AppLayout />
+            </BrowserRouter>
+          </MultiplayerProvider>
+        </ToastProvider>
+      </GuestAuthProvider>
     </SettingsProvider>
   );
 }

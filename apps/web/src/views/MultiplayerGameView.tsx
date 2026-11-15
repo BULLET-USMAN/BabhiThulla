@@ -495,6 +495,7 @@ export function MultiplayerGameView() {
         rematchStatus={rematchStatus}
         hasVotedRematch={hasVotedRematch}
         onReturnToLobby={handleReturnToLobby}
+        roomCode={room.roomCode}
       />
     </div>
   );

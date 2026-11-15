@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Play, Users, BookOpen, Settings, ShieldCheck, Sparkles, Bot } from 'lucide-react';
+import { Play, Users, BookOpen, Settings, ShieldCheck, Sparkles, Bot, BarChart2 } from 'lucide-react';
 import { PlayingCard } from '../components/cards/PlayingCard.js';
 import { Button } from '../components/ui/Button.js';
 import { useSettings } from '../context/SettingsContext.js';
@@ -107,6 +107,11 @@ export function HomeView() {
 
         {/* Secondary Navigation */}
         <div className="flex flex-wrap items-center justify-center gap-3">
+          <Link to="/stats">
+            <Button variant="outline" size="sm" leftIcon={<BarChart2 className="w-4 h-4 text-gold-400" />}>
+              My Statistics
+            </Button>
+          </Link>
           <Link to="/table">
             <Button variant="outline" size="sm" leftIcon={<Sparkles className="w-4 h-4 text-gold-400" />}>
               Table Preview
@@ -133,7 +138,7 @@ export function HomeView() {
             <span>Server-Authoritative • Private 3–6 Player Rooms</span>
           </div>
           <p className="text-[11px] text-gray-400">
-            Phase 1: Visual Design & Table Engine Preview • Live Multiplayer in Phase 2
+            Phase 5: Persistent Multiplayer • Authoritative Engine • Match History & Statistics
           </p>
         </div>
       </footer>

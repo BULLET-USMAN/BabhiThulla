@@ -31,6 +31,8 @@ export const CreateRoomSchema = z.object({
   nickname: NicknameSchema,
   avatar: AvatarSchema,
   maxPlayers: z.number().int().min(3).max(6).optional().default(4),
+  guestId: z.string().optional(),
+  sessionToken: z.string().optional(),
   requestId: z.string().optional(),
 });
 
@@ -38,6 +40,8 @@ export const JoinRoomSchema = z.object({
   roomCode: RoomCodeSchema,
   nickname: NicknameSchema,
   avatar: AvatarSchema,
+  guestId: z.string().optional(),
+  sessionToken: z.string().optional(),
   requestId: z.string().optional(),
 });
 

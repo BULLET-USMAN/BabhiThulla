@@ -130,6 +130,44 @@ When penalty Thulla piles grow hands to 20–30+ cards:
 
 ---
 
+## 🛡️ Phase 5: Reliability, Persistence, Statistics & Anti-Cheat
+
+### 🗄️ Relational Database Architecture (PostgreSQL + Drizzle ORM)
+Fully persistent, crash-recoverable game state and player history backed by PostgreSQL and managed with Drizzle ORM:
+- **9 Relational Tables**:
+  - `guest_identities`: Persistent guest profiles, nicknames, and avatar preferences.
+  - `guest_sessions`: HMAC-hashed reconnect tokens and 30-day session expiry.
+  - `game_rooms`: Private room configurations, player caps, and statuses.
+  - `room_players`: Player seat indices, ready statuses, and room membership.
+  - `game_matches`: Authoritative match records, start/finish timestamps, total tricks, and Bhabhi player outcomes.
+  - `match_snapshots`: Incremental match revisions stored with authenticated **AES-256-GCM** encryption.
+  - `match_player_results`: Finalized match records per player (escapes, ranks, cards remaining, penalties).
+  - `player_statistics`: Authoritative lifetime metrics (games, escapes, Bhabhi counts, Thullas given, piles collected, cards collected, rates).
+  - `match_activities`: Audit log of in-game actions for auditing and anti-cheat verification.
+- **Zero-Config In-Memory Database Fallback**: Built-in hermetic `pg-mem` engine automatically runs in CI and development environments when a live PostgreSQL instance is not connected.
+
+### 🔐 Cryptographic State Encryption & Anti-Cheat
+- **AES-256-GCM State Encryption**: Every match revision is encrypted with an initialization vector (IV) and authentication tag (`AES-256-GCM`). Tampered database states are rejected automatically.
+- **HMAC-SHA256 Session Verification**: Cryptographically signed reconnect tokens survive backend restarts and server migrations without exposing sensitive credentials.
+- **Per-Room Action Serialization**: In-memory action mutex serializes player moves per room, preventing race conditions, double-submissions, and simultaneous card plays.
+- **Strict Anti-Cheat Enforcement**:
+  - Turn order validation (rejects out-of-turn plays).
+  - Card ownership validation (rejects cards not in the player's hand).
+  - Compulsory suit following validation (detects and blocks illegal reneging / revoking).
+  - State invariance check (strictly enforces the 52-card conservation invariant at all times).
+  - Zero Opponent Hand Leakage: Server-side views strip all private cards from network packets, DB logs, and public state broadcasts.
+
+### 🔄 Crash Recovery & Seamless Reconnection
+- **Server Restart Recovery**: On startup, `recoverActiveRoomsFromDatabase()` reconstructs all in-progress matches, private hands, seat positions, and incomplete tricks directly from the latest snapshot into a paused state without redealing or reshuffling cards.
+- **120-Second Reconnection Grace Period**: Disconnected players can refresh their browser or switch networks, automatically rejoining their active match and receiving their private hand.
+
+### 📊 Player Statistics, Match History & Room Standings
+- **Statistics Dashboard (`/stats`)**: Lifetime profile overview, 6 KPI cards (Games Played, Escapes, Bhabhi Count, Thullas Given, Piles Collected, Cards Collected), escape rate %, Bhabhi rate %, and paginated recent match history.
+- **Private Room Standings**: In-room leaderboard modal ranking friends by escape rate and games played directly from the Lobby or End-of-Match dialog.
+- **Rematch Voting**: Synchronized rematch tallying and instant clean redeal without room recreation.
+
+---
+
 ## 🛠️ Development & Scripts
 
 | Command | Description |
@@ -138,9 +176,11 @@ When penalty Thulla piles grow hands to 20–30+ cards:
 | `npm run dev:all` | Concurrently runs backend server (`:3001`) and frontend (`:5173`) |
 | `npm run build` | Compiles `@bhabhi/shared`, `@bhabhi/server`, and `@bhabhi/web` |
 | `npm run typecheck` | Validates strict TypeScript types across all workspaces |
-| `npm run lint` | Runs ESLint across all packages and apps |
-| `npm test` | Runs all 108 unit and integration tests across 24 suites |
+| `npm run lint` | Runs ESLint across all packages and apps (0 warnings, 0 errors) |
+| `npm test` | Runs all 139 unit and integration tests across 28 test suites |
 | `npm run test:e2e` | Runs Playwright browser tests across Desktop and Mobile viewports |
+| `npm run db:generate` | Generates Drizzle database migrations |
+| `npm run db:migrate` | Runs Drizzle migrations against the configured PostgreSQL database |
 
 ---
 
@@ -150,6 +190,7 @@ When penalty Thulla piles grow hands to 20–30+ cards:
 - [x] **Phase 2: Complete Game Engine & Playable Practice Mode**
 - [x] **Phase 3: Real-Time Online Multiplayer & Private Rooms**
 - [x] **Phase 4: Premium Gameplay Experience, Animations, Audio & Emotes**
+- [x] **Phase 5: Multiplayer Reliability, Persistent Storage, Player Statistics & Recovery**
 
 ---
 

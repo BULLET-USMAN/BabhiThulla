@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, Settings, User } from 'lucide-react';
+import { BookOpen, Settings, User, BarChart2 } from 'lucide-react';
 import { useSettings } from '../../context/SettingsContext.js';
 import { AvatarBadge } from '../ui/AvatarBadge.js';
 import { ProfileModal } from '../profile/ProfileModal.js';
@@ -31,6 +31,19 @@ export function Navbar() {
 
           {/* Right Navigation Actions */}
           <div className="flex items-center space-x-2 sm:space-x-4">
+            <Link
+              to="/stats"
+              className={`p-2 sm:px-3 sm:py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1.5 transition-colors ${
+                location.pathname === '/stats'
+                  ? 'bg-gold-500/10 text-gold-300 border border-gold-500/30'
+                  : 'text-gray-300 hover:text-white hover:bg-charcoal-800'
+              }`}
+              title="Statistics"
+            >
+              <BarChart2 className="w-4 h-4" />
+              <span className="hidden md:inline">Statistics</span>
+            </Link>
+
             <Link
               to="/rules"
               className={`p-2 sm:px-3 sm:py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1.5 transition-colors ${

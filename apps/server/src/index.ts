@@ -2,41 +2,59 @@ import http from 'http';
 import { createApp } from './app.js';
 import { config } from './config/index.js';
 import { setupSocketServer } from './socket/index.js';
+import { initDatabase, closeDatabase } from './db/connection.js';
+import { roomManager } from './rooms/roomManager.js';
+import { logger } from './utils/logger.js';
 
-const app = createApp();
-const server = http.createServer(app);
+async function bootstrap() {
+  // Initialize Database (PostgreSQL with automatic migration & fallback)
+  await initDatabase();
 
-// Attach Socket.IO server to HTTP server
-const io = setupSocketServer(server);
+  // Recover active interrupted matches and paused rooms from persistent snapshots
+  await roomManager.recoverActiveRoomsFromDatabase();
 
-server.listen(config.port, () => {
-  console.log(`========================================`);
-  console.log(`  Bhabhi Thulla Multiplayer Server (Phase 3)`);
-  console.log(`  Environment: ${config.nodeEnv}`);
-  console.log(`  Listening on: http://localhost:${config.port}`);
-  console.log(`  Health check: http://localhost:${config.port}/api/health`);
-  console.log(`========================================`);
-});
+  const app = createApp();
+  const server = http.createServer(app);
 
-// Graceful shutdown handling
-function handleShutdown(signal: string) {
-  console.log(`\n[SHUTDOWN] Received ${signal}. Closing Socket.IO & HTTP server gracefully...`);
+  // Attach Socket.IO server to HTTP server
+  const io = setupSocketServer(server);
 
-  io.close(() => {
-    console.log('[SHUTDOWN] Socket.IO closed cleanly.');
+  server.listen(config.port, () => {
+    console.log(`========================================`);
+    console.log(`  Bhabhi Thulla Multiplayer Server (Phase 5)`);
+    console.log(`  Environment: ${config.nodeEnv}`);
+    console.log(`  Listening on: http://localhost:${config.port}`);
+    console.log(`  Health check: http://localhost:${config.port}/api/health`);
+    console.log(`  Readiness:    http://localhost:${config.port}/api/ready`);
+    console.log(`========================================`);
   });
 
-  server.close(() => {
-    console.log('[SHUTDOWN] HTTP server closed cleanly. Exiting process.');
-    process.exit(0);
-  });
+  // Graceful shutdown handling
+  async function handleShutdown(signal: string) {
+    logger.info(`Received ${signal}. Closing Socket.IO, HTTP server & database gracefully...`);
 
-  // Force exit after 5 seconds if connections linger
-  setTimeout(() => {
-    console.error('[SHUTDOWN] Forcefully shutting down after timeout.');
-    process.exit(1);
-  }, 5000);
+    io.close(() => {
+      logger.info('Socket.IO closed cleanly.');
+    });
+
+    server.close(async () => {
+      await closeDatabase();
+      logger.info('HTTP server and Database closed cleanly. Exiting process.');
+      process.exit(0);
+    });
+
+    // Force exit after 5 seconds if connections linger
+    setTimeout(() => {
+      console.error('[SHUTDOWN] Forcefully shutting down after timeout.');
+      process.exit(1);
+    }, 5000);
+  }
+
+  process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+  process.on('SIGINT', () => handleShutdown('SIGINT'));
 }
 
-process.on('SIGTERM', () => handleShutdown('SIGTERM'));
-process.on('SIGINT', () => handleShutdown('SIGINT'));
+bootstrap().catch((err) => {
+  console.error('[BOOTSTRAP FATAL ERROR]', err);
+  process.exit(1);
+});

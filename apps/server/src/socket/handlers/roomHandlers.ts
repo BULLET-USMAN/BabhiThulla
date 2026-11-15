@@ -30,12 +30,13 @@ export function registerRoomHandlers(
     }
 
     try {
-      const { nickname, avatar, maxPlayers, requestId } = parsed.data;
+      const { nickname, avatar, maxPlayers, guestId, requestId } = parsed.data;
       const { room, player, reconnectToken } = roomManager.createRoom({
         nickname,
         avatar,
         maxPlayers,
         socketId: socket.id,
+        guestId,
       });
 
       const roomChannel = `room:${room.code}`;
@@ -77,12 +78,13 @@ export function registerRoomHandlers(
     }
 
     try {
-      const { roomCode, nickname, avatar, requestId } = parsed.data;
+      const { roomCode, nickname, avatar, guestId, requestId } = parsed.data;
       const result = roomManager.joinRoom({
         roomCode,
         nickname,
         avatar,
         socketId: socket.id,
+        guestId,
       });
 
       if (!result.success || !result.room || !result.player || !result.reconnectToken) {

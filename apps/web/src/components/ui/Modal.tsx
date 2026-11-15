@@ -51,7 +51,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-charcoal-950/80 backdrop-blur-md animate-fade-in"
+      className="fixed inset-0 z-50 overflow-y-auto bg-charcoal-950/80 backdrop-blur-md animate-fade-in"
       role="dialog"
       aria-modal="true"
       onClick={(e) => {
@@ -60,33 +60,35 @@ export function Modal({
         }
       }}
     >
-      <div
-        ref={modalRef}
-        className={`w-full ${maxWidthClasses[maxWidth]} bg-charcoal-850 border border-gold-500/30 rounded-2xl shadow-2xl overflow-hidden transition-all transform animate-scale-up`}
-      >
-        {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-charcoal-700/80 bg-charcoal-900/60">
-          <div>
-            {title && (
-              <h3 className="text-lg font-semibold text-gold-300 font-display">
-                {title}
-              </h3>
-            )}
-            {description && (
-              <p className="text-xs text-gray-400 mt-0.5">{description}</p>
-            )}
+      <div className="flex min-h-full items-center justify-center p-4 pointer-events-none">
+        <div
+          ref={modalRef}
+          className={`w-full ${maxWidthClasses[maxWidth]} bg-charcoal-850 border border-gold-500/30 rounded-2xl shadow-2xl overflow-hidden transition-all transform animate-scale-up pointer-events-auto`}
+        >
+          {/* Modal Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-charcoal-700/80 bg-charcoal-900/60">
+            <div>
+              {title && (
+                <h3 className="text-lg font-semibold text-gold-300 font-display">
+                  {title}
+                </h3>
+              )}
+              {description && (
+                <p className="text-xs text-gray-400 mt-0.5">{description}</p>
+              )}
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-charcoal-700/60 transition-colors"
+              aria-label="Close modal"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-charcoal-700/60 transition-colors"
-            aria-label="Close modal"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
 
-        {/* Modal Body */}
-        <div className="p-6 text-cream-100">{children}</div>
+          {/* Modal Body */}
+          <div className="p-6 text-cream-100">{children}</div>
+        </div>
       </div>
     </div>
   );

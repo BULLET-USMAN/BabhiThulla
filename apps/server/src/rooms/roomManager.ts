@@ -1,15 +1,18 @@
-import { AvatarId } from '@bhabhi/shared';
+import { AvatarId, GameState } from '@bhabhi/shared';
 import { ServerRoom, ServerRoomMember } from './roomTypes.js';
 import { generateRoomCode } from './roomCode.js';
 import { sessionManager } from '../sessions/guestSessionManager.js';
 import { GameSession } from '../game/gameSession.js';
 import { logger } from '../utils/logger.js';
+import { matchRepository } from '../db/matchRepository.js';
+import { decryptSnapshot } from '../security/encryption.js';
 
 export interface CreateRoomParams {
   nickname: string;
   avatar: AvatarId;
   maxPlayers?: number;
   socketId: string;
+  guestId?: string;
 }
 
 export interface JoinRoomParams {
@@ -17,6 +20,7 @@ export interface JoinRoomParams {
   nickname: string;
   avatar: AvatarId;
   socketId: string;
+  guestId?: string;
 }
 
 export class RoomManager {
@@ -29,6 +33,10 @@ export class RoomManager {
 
   getRoom(roomCode: string): ServerRoom | undefined {
     return this.rooms.get(roomCode.toUpperCase());
+  }
+
+  getAllRooms(): ServerRoom[] {
+    return Array.from(this.rooms.values());
   }
 
   getRoomBySocketId(socketId: string): { room: ServerRoom; player: ServerRoomMember } | undefined {
@@ -49,11 +57,12 @@ export class RoomManager {
     avatar,
     maxPlayers = 4,
     socketId,
+    guestId,
   }: CreateRoomParams): { room: ServerRoom; player: ServerRoomMember; reconnectToken: string } {
     const existingCodes = new Set(this.rooms.keys());
     const code = generateRoomCode(existingCodes);
     const roomId = `room-${Date.now()}-${code}`;
-    const playerId = `p-${Date.now()}-1`;
+    const playerId = guestId || `p-${Date.now()}-1`;
 
     const hostMember: ServerRoomMember = {
       id: playerId,
@@ -89,6 +98,29 @@ export class RoomManager {
       maxPlayers: room.maxPlayers,
     });
 
+    // Asynchronously persist room & host seat
+    matchRepository
+      .upsertRoom({
+        id: roomId,
+        roomCode: code,
+        hostPlayerId: playerId,
+        maxPlayers: room.maxPlayers,
+        status: 'waiting',
+      })
+      .then(() => {
+        return matchRepository.upsertRoomPlayer({
+          id: `rp-${roomId}-${playerId}`,
+          roomId,
+          guestIdentityId: playerId,
+          seatIndex: 0,
+          isHost: true,
+          isReady: true,
+        });
+      })
+      .catch((err) => {
+        logger.warn('Failed to asynchronously persist room record', { err });
+      });
+
     return { room, player: hostMember, reconnectToken };
   }
 
@@ -97,6 +129,7 @@ export class RoomManager {
     nickname,
     avatar,
     socketId,
+    guestId,
   }: JoinRoomParams): {
     success: boolean;
     room?: ServerRoom;
@@ -130,7 +163,7 @@ export class RoomManager {
       };
     }
 
-    const playerId = `p-${Date.now()}-${room.members.length + 1}`;
+    const playerId = guestId || `p-${Date.now()}-${room.members.length + 1}`;
     const seatIndex = room.members.length;
 
     const newMember: ServerRoomMember = {
@@ -155,6 +188,20 @@ export class RoomManager {
       playerId,
       seatIndex,
     });
+
+    // Asynchronously persist player seat
+    matchRepository
+      .upsertRoomPlayer({
+        id: `rp-${room.id}-${playerId}`,
+        roomId: room.id,
+        guestIdentityId: playerId,
+        seatIndex,
+        isHost: false,
+        isReady: false,
+      })
+      .catch((err) => {
+        logger.warn('Failed to asynchronously persist room player', { err });
+      });
 
     return { success: true, room, player: newMember, reconnectToken };
   }
@@ -203,7 +250,7 @@ export class RoomManager {
     room.lastActivityAt = Date.now();
     this.socketToRoom.set(newSocketId, { roomCode: cleanCode, playerId });
 
-    // Check if match was paused due to this player's disconnection
+    // Check if match was paused due to disconnection
     if (room.gameSession && room.gameSession.getIsPaused()) {
       const allActiveConnected = room.members
         .filter((m) => {
@@ -242,6 +289,21 @@ export class RoomManager {
 
     player.isReady = isReady;
     room.lastActivityAt = Date.now();
+
+    // Persist ready status update
+    matchRepository
+      .upsertRoomPlayer({
+        id: `rp-${room.id}-${playerId}`,
+        roomId: room.id,
+        guestIdentityId: playerId,
+        seatIndex: player.seatIndex,
+        isHost: player.isHost,
+        isReady,
+      })
+      .catch((err) => {
+        logger.warn('Failed to update ready state in persistence', { err });
+      });
+
     return { success: true, room };
   }
 
@@ -281,9 +343,27 @@ export class RoomManager {
       isBot: false,
     }));
 
-    room.gameSession = new GameSession(cleanCode, participants, seed);
+    room.gameSession = new GameSession(cleanCode, {
+      roomCode: cleanCode,
+      roomId: room.id,
+      participants,
+      seed,
+    });
     room.status = 'playing';
     room.lastActivityAt = Date.now();
+
+    // Persist status change to room
+    matchRepository
+      .upsertRoom({
+        id: room.id,
+        roomCode: cleanCode,
+        hostPlayerId: room.hostPlayerId,
+        maxPlayers: room.maxPlayers,
+        status: 'playing',
+      })
+      .catch((err) => {
+        logger.warn('Failed to persist room status', { err });
+      });
 
     logger.info(`Match started in room ${cleanCode} with ${participants.length} players`);
     return { success: true, room };
@@ -319,7 +399,7 @@ export class RoomManager {
     const allApproved = connectedMembers.every((m) => m.rematchVoted === true);
 
     if (allApproved && connectedMembers.length >= 3) {
-      // Clear rematch votes and start fresh deal
+      // Clear rematch votes and start fresh deal with new match ID
       for (const m of room.members) {
         m.rematchVoted = undefined;
       }
@@ -440,6 +520,79 @@ export class RoomManager {
     }
 
     return { success: true, room, closed: false, newHostId };
+  }
+
+  /**
+   * Recovers active matches and paused rooms from persistent database snapshots on server restart.
+   */
+  async recoverActiveRoomsFromDatabase(): Promise<number> {
+    try {
+      const activeMatches = await matchRepository.getActiveMatches();
+      let count = 0;
+
+      for (const item of activeMatches) {
+        try {
+          const decryptedState = decryptSnapshot<GameState>(item.snapshot.encryptedState);
+          const roomCode = item.room.roomCode.toUpperCase();
+          const roomId = item.room.id;
+
+          const participants = decryptedState.players.map((p) => ({
+            id: p.id,
+            nickname: p.nickname,
+            avatar: p.avatar,
+            isBot: false,
+          }));
+
+          const members: ServerRoomMember[] = participants.map((p, idx) => ({
+            id: p.id,
+            nickname: p.nickname,
+            avatar: p.avatar,
+            socketId: '',
+            isHost: p.id === item.room.hostPlayerId,
+            isReady: true,
+            isConnected: false,
+            seatIndex: idx,
+          }));
+
+          const gameSession = new GameSession(roomCode, {
+            roomCode,
+            roomId,
+            matchId: item.match.id,
+            participants,
+            restoredState: decryptedState,
+            restoredRevision: item.snapshot.revision,
+            isPaused: true,
+            pauseReason: 'Match restored after server restart. Waiting for players to reconnect.',
+          });
+
+          const room: ServerRoom = {
+            id: roomId,
+            code: roomCode,
+            hostPlayerId: item.room.hostPlayerId,
+            maxPlayers: item.room.maxPlayers,
+            status: 'paused',
+            members,
+            createdAt: new Date(item.room.createdAt).getTime(),
+            lastActivityAt: Date.now(),
+            gameSession,
+          };
+
+          this.rooms.set(roomCode, room);
+          count++;
+        } catch (err) {
+          logger.error('Failed to reconstruct room from persistent snapshot', {
+            matchId: item.match.id,
+            err,
+          });
+        }
+      }
+
+      logger.info(`Recovered ${count} active room(s) from persistent database storage.`);
+      return count;
+    } catch (err) {
+      logger.error('Database error during room recovery', { err });
+      return 0;
+    }
   }
 
   cleanupInactiveRooms() {

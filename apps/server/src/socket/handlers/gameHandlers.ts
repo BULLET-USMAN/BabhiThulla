@@ -3,6 +3,7 @@ import { PlayCardSchema, RematchVoteSchema } from '../../security/validation.js'
 import { roomManager } from '../../rooms/roomManager.js';
 import { logger } from '../../utils/logger.js';
 import { RateLimiter } from '../../security/rateLimiter.js';
+import { actionQueue } from '../../utils/actionQueue.js';
 
 export function registerGameHandlers(
   io: Server,
@@ -10,7 +11,7 @@ export function registerGameHandlers(
   rateLimiter: RateLimiter
 ) {
   // PLAY CARD
-  socket.on('game:play-card', (payload: unknown, ack?: (res: unknown) => void) => {
+  socket.on('game:play-card', async (payload: unknown, ack?: (res: unknown) => void) => {
     if (!rateLimiter.isAllowed(socket.id)) {
       ack?.({ success: false, error: 'Action rate limit reached. Slow down.' });
       return;
@@ -23,76 +24,79 @@ export function registerGameHandlers(
     }
 
     const { roomCode, cardId, requestId } = parsed.data;
-    const mapping = roomManager.getRoomBySocketId(socket.id);
 
-    if (!mapping || mapping.room.code !== roomCode) {
-      ack?.({ success: false, error: 'Unauthorized game action.' });
-      return;
-    }
+    await actionQueue.runExclusive(roomCode, async () => {
+      const mapping = roomManager.getRoomBySocketId(socket.id);
 
-    const room = mapping.room;
-    if (!room.gameSession) {
-      ack?.({ success: false, error: 'No active match found in room.' });
-      return;
-    }
+      if (!mapping || mapping.room.code !== roomCode) {
+        ack?.({ success: false, error: 'Unauthorized game action.' });
+        return;
+      }
 
-    const playerId = mapping.player.id;
-    const result = room.gameSession.playCard(playerId, cardId, requestId);
+      const room = mapping.room;
+      if (!room.gameSession) {
+        ack?.({ success: false, error: 'No active match found in room.' });
+        return;
+      }
 
-    if (!result.success) {
-      ack?.({ success: false, requestId, error: result.error });
-      return;
-    }
+      const playerId = mapping.player.id;
+      const result = await room.gameSession.playCard(playerId, cardId, requestId);
 
-    ack?.({ success: true, requestId });
+      if (!result.success) {
+        ack?.({ success: false, requestId, error: result.error });
+        return;
+      }
 
-    const roomChannel = `room:${room.code}`;
-    const session = room.gameSession;
-    const revision = session.getRevision();
+      ack?.({ success: true, requestId });
 
-    // Broadcast individual events
-    if (result.events) {
-      for (const ev of result.events) {
-        if (ev.type === 'THULLA_OCCURRED') {
-          io.to(roomChannel).emit('game:thulla', {
+      const roomChannel = `room:${room.code}`;
+      const session = room.gameSession;
+      const revision = session.getRevision();
+
+      // Broadcast individual events
+      if (result.events) {
+        for (const ev of result.events) {
+          if (ev.type === 'THULLA_OCCURRED') {
+            io.to(roomChannel).emit('game:thulla', {
+              roomCode: room.code,
+              playerId: ev.playerId,
+              card: ev.card,
+            });
+          } else if (ev.type === 'TRICK_RESOLVED' || ev.type === 'PILE_COLLECTED') {
+            io.to(roomChannel).emit('game:trick-resolved', {
+              roomCode: room.code,
+              result: session.getGameState().lastTrickResult,
+            });
+          } else if (ev.type === 'PLAYER_ESCAPED') {
+            io.to(roomChannel).emit('game:player-escaped', {
+              roomCode: room.code,
+              playerId: ev.playerId,
+            });
+          } else if (ev.type === 'BHABHI_DECLARED') {
+            io.to(roomChannel).emit('game:finished', {
+              roomCode: room.code,
+              bhabhiPlayerId: session.getGameState().bhabhiPlayerId,
+              escapedPlayerIds: session.getGameState().escapedPlayerIds,
+            });
+          }
+        }
+      }
+
+      // STRICT CARD PRIVACY:
+      // Broadcast updated player-specific view to each connected player's socket
+      for (const member of room.members) {
+        if (member.isConnected && member.socketId) {
+          const playerView = session.getPlayerView(member.id);
+          io.to(member.socketId).emit('game:state', {
             roomCode: room.code,
-            playerId: ev.playerId,
-            card: ev.card,
-          });
-        } else if (ev.type === 'TRICK_RESOLVED' || ev.type === 'PILE_COLLECTED') {
-          io.to(roomChannel).emit('game:trick-resolved', {
-            roomCode: room.code,
-            result: session.getGameState().lastTrickResult,
-          });
-        } else if (ev.type === 'PLAYER_ESCAPED') {
-          io.to(roomChannel).emit('game:player-escaped', {
-            roomCode: room.code,
-            playerId: ev.playerId,
-          });
-        } else if (ev.type === 'BHABHI_DECLARED') {
-          io.to(roomChannel).emit('game:finished', {
-            roomCode: room.code,
-            bhabhiPlayerId: session.getGameState().bhabhiPlayerId,
-            escapedPlayerIds: session.getGameState().escapedPlayerIds,
+            revision,
+            view: playerView,
+            isPaused: session.getIsPaused(),
+            pauseReason: session.getPauseReason(),
           });
         }
       }
-    }
-
-    // STRICT CARD PRIVACY:
-    // Broadcast updated player-specific view to each connected player's socket
-    for (const member of room.members) {
-      if (member.isConnected && member.socketId) {
-        const playerView = session.getPlayerView(member.id);
-        io.to(member.socketId).emit('game:state', {
-          roomCode: room.code,
-          revision,
-          view: playerView,
-          isPaused: session.getIsPaused(),
-          pauseReason: session.getPauseReason(),
-        });
-      }
-    }
+    });
   });
 
   // REMATCH VOTE

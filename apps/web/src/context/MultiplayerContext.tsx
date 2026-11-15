@@ -73,7 +73,7 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [credentials, setCredentials] = useState<ClientSessionCredentials | null>(() => {
     if (typeof window === 'undefined') return null;
     try {
-      const stored = sessionStorage.getItem(SESSION_STORAGE_KEY);
+      const stored = localStorage.getItem(SESSION_STORAGE_KEY) || sessionStorage.getItem(SESSION_STORAGE_KEY);
       return stored ? JSON.parse(stored) : null;
     } catch {
       return null;
@@ -100,8 +100,14 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setCredentials(creds);
     if (typeof window === 'undefined') return;
     if (creds) {
-      sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(creds));
+      try {
+        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(creds));
+        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(creds));
+      } catch (e) {
+        console.warn('Failed to persist session', e);
+      }
     } else {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
       sessionStorage.removeItem(SESSION_STORAGE_KEY);
     }
   };
@@ -344,6 +350,19 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
   }, [room, credentials, reconnect, addToast]);
 
+  const getStoredGuestId = (): string | undefined => {
+    try {
+      const stored = localStorage.getItem('bhabhi_guest_identity');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return parsed.guestId;
+      }
+    } catch {
+      // ignore
+    }
+    return undefined;
+  };
+
   const createRoom = async (
     nickname: string,
     avatar: AvatarId,
@@ -352,11 +371,13 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setIsConnecting(true);
     setError(null);
 
+    const guestId = getStoredGuestId();
     const requestId = `cr-${Date.now()}`;
     const res = await socketClient.emitWithAck<RoomCreatedResponse>('room:create', {
       nickname,
       avatar,
       maxPlayers,
+      guestId,
       requestId,
     });
 
@@ -382,11 +403,13 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setIsConnecting(true);
     setError(null);
 
+    const guestId = getStoredGuestId();
     const requestId = `jr-${Date.now()}`;
     const res = await socketClient.emitWithAck<RoomJoinedResponse>('room:join', {
       roomCode: roomCode.trim().toUpperCase(),
       nickname,
       avatar,
+      guestId,
       requestId,
     });
 

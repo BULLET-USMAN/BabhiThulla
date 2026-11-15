@@ -1,29 +1,39 @@
 import crypto from 'crypto';
 
+const SESSION_SECRET = process.env.SESSION_SECRET || 'bhabhi-thulla-insecure-secret-change-in-prod';
+
 export class GuestSessionManager {
   // Key: `${roomCode}:${playerId}` -> reconnectToken
   private tokens = new Map<string, string>();
 
   /**
-   * Generates and stores a cryptographically secure opaque reconnect token for a player in a room.
+   * Generates a cryptographically authenticated reconnect token for a player in a room.
+   * Uses HMAC-SHA256 with the server's secret, enabling reliable recovery across restarts.
    */
   createSession(roomCode: string, playerId: string): string {
-    const token = crypto.randomBytes(32).toString('hex');
     const key = this.getKey(roomCode, playerId);
+    const token = crypto
+      .createHmac('sha256', SESSION_SECRET)
+      .update(key)
+      .digest('hex');
+
     this.tokens.set(key, token);
     return token;
   }
 
   /**
    * Validates a reconnect token for a given room and player identity.
+   * Supports in-memory cache and cross-restart cryptographic verification.
    */
   validateSession(roomCode: string, playerId: string, token: string): boolean {
     const key = this.getKey(roomCode, playerId);
-    const expected = this.tokens.get(key);
-    if (!expected) return false;
+    const expected =
+      this.tokens.get(key) ||
+      crypto.createHmac('sha256', SESSION_SECRET).update(key).digest('hex');
+
+    if (!token || token.length !== expected.length) return false;
 
     // Constant-time buffer comparison to prevent timing attacks
-    if (token.length !== expected.length) return false;
     return crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expected));
   }
 
