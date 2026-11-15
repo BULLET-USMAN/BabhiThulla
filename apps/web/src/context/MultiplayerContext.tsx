@@ -2,8 +2,12 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import {
   AvatarId,
   ClientSessionCredentials,
+  EmoteBroadcastPayload,
+  EmoteId,
   GameSyncPayload,
   PlayerGameView,
+  QuickChatBroadcastPayload,
+  QuickChatId,
   RematchStatusPayload,
   RoomCreatedResponse,
   RoomJoinedResponse,
@@ -11,10 +15,27 @@ import {
   TrickResult,
 } from '@bhabhi/shared';
 import { socketClient } from '../services/socketClient.js';
+import { audioManager } from '../audio/audioManager.js';
 import { soundService } from '../services/sound.js';
 import { useToast } from './ToastContext.js';
 
 const SESSION_STORAGE_KEY = 'bhabhi_multiplayer_session';
+
+export interface ActiveEmote {
+  id: string;
+  playerId: string;
+  emoteId: EmoteId;
+  symbol: string;
+  timestamp: number;
+}
+
+export interface ActiveQuickChat {
+  id: string;
+  playerId: string;
+  messageId: QuickChatId;
+  text: string;
+  timestamp: number;
+}
 
 export interface MultiplayerContextValue {
   room: RoomSummary | null;
@@ -29,12 +50,16 @@ export interface MultiplayerContextValue {
   rematchStatus: RematchStatusPayload | null;
   lastTrickResult: TrickResult | null;
   thullaBanner: { playerId: string; cardId?: string } | null;
+  activeEmotes: ActiveEmote[];
+  activeQuickChats: ActiveQuickChat[];
   createRoom: (nickname: string, avatar: AvatarId, maxPlayers?: number) => Promise<{ success: boolean; roomCode?: string; error?: string }>;
   joinRoom: (roomCode: string, nickname: string, avatar: AvatarId) => Promise<{ success: boolean; error?: string }>;
   toggleReady: (isReady: boolean) => Promise<void>;
   startGame: () => Promise<{ success: boolean; error?: string }>;
   playCard: (cardId: string) => Promise<{ success: boolean; error?: string }>;
   voteRematch: (vote: boolean) => Promise<void>;
+  sendEmote: (emoteId: EmoteId) => Promise<boolean>;
+  sendQuickChat: (messageId: QuickChatId) => Promise<boolean>;
   leaveRoom: () => Promise<void>;
   reconnect: () => Promise<boolean>;
 }
@@ -65,6 +90,8 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [rematchStatus, setRematchStatus] = useState<RematchStatusPayload | null>(null);
   const [lastTrickResult, setLastTrickResult] = useState<TrickResult | null>(null);
   const [thullaBanner, setThullaBanner] = useState<{ playerId: string; cardId?: string } | null>(null);
+  const [activeEmotes, setActiveEmotes] = useState<ActiveEmote[]>([]);
+  const [activeQuickChats, setActiveQuickChats] = useState<ActiveQuickChat[]>([]);
 
   const graceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -145,12 +172,14 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
 
     const handleGameStarted = () => {
+      audioManager.playCardDeal();
       soundService.playCardPlay();
       addToast('The match has begun! Check your cards.', 'info');
       setRematchStatus(null);
     };
 
     const handleThulla = (data: { playerId: string; card?: { id: string } }) => {
+      audioManager.playThulla();
       soundService.playThulla();
       const p = room?.players.find((pl) => pl.id === data.playerId);
       const name = p?.nickname || 'A player';
@@ -162,19 +191,23 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
     const handleTrickResolved = (data: { result: TrickResult }) => {
       setLastTrickResult(data.result);
       if (data.result.isThulla) {
+        audioManager.playPileCollect();
         soundService.playCollectPile();
       } else {
+        audioManager.playTrickSweep();
         soundService.playCardPlay();
       }
     };
 
     const handlePlayerEscaped = (data: { playerId: string }) => {
+      audioManager.playPlayerEscape();
       const p = room?.players.find((pl) => pl.id === data.playerId);
       const name = p?.nickname || 'A player';
       addToast(`🎉 ${name} shed all cards and escaped!`, 'success');
     };
 
     const handleGameFinished = (data: { bhabhiPlayerId: string }) => {
+      audioManager.playBhabhiFinish();
       const bhabhi = room?.players.find((pl) => pl.id === data.bhabhiPlayerId);
       const name = bhabhi?.nickname || 'A player';
       addToast(`Game Over! ${name} is the Bhabhi!`, 'warning');
@@ -212,6 +245,7 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
 
     const handlePlayerJoined = (data: { player: { nickname: string } }) => {
+      audioManager.playPlayerJoined();
       addToast(`${data.player.nickname} joined the room.`, 'info');
     };
 
@@ -224,6 +258,9 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     const handleRematchStatus = (data: RematchStatusPayload) => {
       setRematchStatus(data);
+      if (data.allApproved) {
+        audioManager.playRematchStart();
+      }
     };
 
     const handleRoomClosed = (data: { reason?: string }) => {
@@ -231,6 +268,36 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
       setRoom(null);
       setGameState(null);
       persistSession(null);
+    };
+
+    const handlePlayerEmote = (data: EmoteBroadcastPayload) => {
+      audioManager.playEmote();
+      const emoteItem: ActiveEmote = {
+        id: `${Date.now()}-${Math.random()}`,
+        playerId: data.playerId,
+        emoteId: data.emoteId,
+        symbol: data.symbol,
+        timestamp: data.timestamp,
+      };
+      setActiveEmotes((prev) => [...prev, emoteItem]);
+      setTimeout(() => {
+        setActiveEmotes((prev) => prev.filter((e) => e.id !== emoteItem.id));
+      }, 3500);
+    };
+
+    const handlePlayerQuickChat = (data: QuickChatBroadcastPayload) => {
+      audioManager.playButtonClick();
+      const chatItem: ActiveQuickChat = {
+        id: `${Date.now()}-${Math.random()}`,
+        playerId: data.playerId,
+        messageId: data.messageId,
+        text: data.text,
+        timestamp: data.timestamp,
+      };
+      setActiveQuickChats((prev) => [...prev, chatItem]);
+      setTimeout(() => {
+        setActiveQuickChats((prev) => prev.filter((c) => c.id !== chatItem.id));
+      }, 4500);
     };
 
     socket.on('connect', handleConnect);
@@ -248,6 +315,8 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
     socket.on('player:left', handlePlayerLeft);
     socket.on('game:rematch-status', handleRematchStatus);
     socket.on('room:closed', handleRoomClosed);
+    socket.on('player:emote', handlePlayerEmote);
+    socket.on('player:quick-chat', handlePlayerQuickChat);
 
     if (socket.connected) {
       setIsConnected(true);
@@ -269,6 +338,8 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
       socket.off('player:left', handlePlayerLeft);
       socket.off('game:rematch-status', handleRematchStatus);
       socket.off('room:closed', handleRoomClosed);
+      socket.off('player:emote', handlePlayerEmote);
+      socket.off('player:quick-chat', handlePlayerQuickChat);
       if (graceTimerRef.current) clearInterval(graceTimerRef.current);
     };
   }, [room, credentials, reconnect, addToast]);
@@ -335,6 +406,7 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const toggleReady = async (isReady: boolean): Promise<void> => {
     if (!room) return;
+    audioManager.playButtonClick();
     const res = await socketClient.emitWithAck('room:ready', {
       roomCode: room.roomCode,
       isReady,
@@ -346,6 +418,7 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const startGame = async (): Promise<{ success: boolean; error?: string }> => {
     if (!room) return { success: false, error: 'No active room.' };
+    audioManager.playButtonClick();
     const res = await socketClient.emitWithAck('room:start', {
       roomCode: room.roomCode,
     });
@@ -358,6 +431,7 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const playCard = async (cardId: string): Promise<{ success: boolean; error?: string }> => {
     if (!room || !credentials) return { success: false, error: 'No active room.' };
+    audioManager.playCardPlay();
     soundService.playCardPlay();
 
     const requestId = `play-${Date.now()}-${cardId}`;
@@ -376,6 +450,7 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const voteRematch = async (vote: boolean): Promise<void> => {
     if (!room) return;
+    audioManager.playButtonClick();
     const res = await socketClient.emitWithAck('game:rematch-vote', {
       roomCode: room.roomCode,
       vote,
@@ -385,13 +460,36 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   };
 
+  const sendEmote = async (emoteId: EmoteId): Promise<boolean> => {
+    if (!room) return false;
+    audioManager.playEmote();
+    const res = await socketClient.emitWithAck('room:emote', {
+      roomCode: room.roomCode,
+      emoteId,
+    });
+    return res.success;
+  };
+
+  const sendQuickChat = async (messageId: QuickChatId): Promise<boolean> => {
+    if (!room) return false;
+    audioManager.playButtonClick();
+    const res = await socketClient.emitWithAck('room:quick-chat', {
+      roomCode: room.roomCode,
+      messageId,
+    });
+    return res.success;
+  };
+
   const leaveRoom = async (): Promise<void> => {
+    audioManager.playButtonClick();
     if (room) {
       await socketClient.emitWithAck('room:leave', { roomCode: room.roomCode });
     }
     setRoom(null);
     setGameState(null);
     persistSession(null);
+    setActiveEmotes([]);
+    setActiveQuickChats([]);
   };
 
   const value: MultiplayerContextValue = {
@@ -407,12 +505,16 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
     rematchStatus,
     lastTrickResult,
     thullaBanner,
+    activeEmotes,
+    activeQuickChats,
     createRoom,
     joinRoom,
     toggleReady,
     startGame,
     playCard,
     voteRematch,
+    sendEmote,
+    sendQuickChat,
     leaveRoom,
     reconnect,
   };
@@ -436,12 +538,16 @@ export function useMultiplayer(): MultiplayerContextValue {
       rematchStatus: null,
       lastTrickResult: null,
       thullaBanner: null,
+      activeEmotes: [],
+      activeQuickChats: [],
       createRoom: async () => ({ success: false, error: 'No multiplayer provider' }),
       joinRoom: async () => ({ success: false, error: 'No multiplayer provider' }),
       toggleReady: async () => {},
       startGame: async () => ({ success: false, error: 'No multiplayer provider' }),
       playCard: async () => ({ success: false, error: 'No multiplayer provider' }),
       voteRematch: async () => {},
+      sendEmote: async () => false,
+      sendQuickChat: async () => false,
       leaveRoom: async () => {},
       reconnect: async () => false,
     };

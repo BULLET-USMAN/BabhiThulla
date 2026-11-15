@@ -38,6 +38,34 @@ export interface ClientSessionCredentials {
   roomCode: string;
 }
 
+// Emotes & Reactions
+export const ALLOWED_EMOTES = [
+  { id: 'laugh', symbol: '😂', label: 'Laugh' },
+  { id: 'cool', symbol: '😎', label: 'Cool' },
+  { id: 'shocked', symbol: '😱', label: 'Shocked' },
+  { id: 'crying', symbol: '😭', label: 'Crying' },
+  { id: 'clap', symbol: '👏', label: 'Clap' },
+  { id: 'skull', symbol: '💀', label: 'Skull' },
+  { id: 'fire', symbol: '🔥', label: 'Fire' },
+  { id: 'heart', symbol: '❤️', label: 'Heart' },
+] as const;
+
+export type EmoteId = (typeof ALLOWED_EMOTES)[number]['id'];
+
+// Quick Chat Predefined Messages
+export const ALLOWED_QUICK_CHATS = [
+  { id: 'nice_move', text: 'Nice move!' },
+  { id: 'thulla', text: 'THULLA!' },
+  { id: 'youre_next', text: "You're next!" },
+  { id: 'good_game', text: 'Good game!' },
+  { id: 'lets_go', text: "Let's go!" },
+  { id: 'oops', text: 'Oops!' },
+  { id: 'play_faster', text: 'Play faster!' },
+  { id: 'rematch', text: 'Rematch?' },
+] as const;
+
+export type QuickChatId = (typeof ALLOWED_QUICK_CHATS)[number]['id'];
+
 // Client -> Server Payloads
 export interface CreateRoomRequest {
   nickname: string;
@@ -83,6 +111,16 @@ export interface LeaveRoomRequest {
   roomCode: string;
 }
 
+export interface SendEmoteRequest {
+  roomCode: string;
+  emoteId: EmoteId;
+}
+
+export interface SendQuickChatRequest {
+  roomCode: string;
+  messageId: QuickChatId;
+}
+
 // Server -> Client Payloads
 export interface ActionAckResponse<T = unknown> {
   success: boolean;
@@ -114,6 +152,22 @@ export interface RematchStatusPayload {
   approvals: string[]; // player IDs who approved
   totalRequired: number;
   allApproved: boolean;
+}
+
+export interface EmoteBroadcastPayload {
+  roomCode: string;
+  playerId: string;
+  emoteId: EmoteId;
+  symbol: string;
+  timestamp: number;
+}
+
+export interface QuickChatBroadcastPayload {
+  roomCode: string;
+  playerId: string;
+  messageId: QuickChatId;
+  text: string;
+  timestamp: number;
 }
 
 export interface MultiplayerErrorMessage {

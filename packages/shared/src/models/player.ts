@@ -18,7 +18,13 @@ export interface GuestSettings {
   nickname: string;
   avatar: AvatarId;
   soundEnabled: boolean;
+  sfxEnabled?: boolean;
+  volume?: number;
   reducedMotion: boolean;
+  animationSpeed?: 'normal' | 'fast' | 'reduced';
+  muteEmotes?: boolean;
+  muteQuickChat?: boolean;
+  dragAndDropEnabled?: boolean;
   cardSize: 'compact' | 'normal' | 'large';
 }
 
@@ -26,7 +32,13 @@ export const DEFAULT_GUEST_SETTINGS: GuestSettings = {
   nickname: 'Player',
   avatar: 'avatar-1',
   soundEnabled: true,
+  sfxEnabled: true,
+  volume: 70,
   reducedMotion: false,
+  animationSpeed: 'normal',
+  muteEmotes: false,
+  muteQuickChat: false,
+  dragAndDropEnabled: true,
   cardSize: 'normal',
 };
 

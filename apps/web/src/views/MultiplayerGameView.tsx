@@ -1,7 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
-  LogOut,
   Volume2,
   VolumeX,
   HelpCircle,
@@ -11,11 +10,13 @@ import {
   Check,
   AlertTriangle,
   RefreshCw,
+  Sliders,
+  Sparkles,
 } from 'lucide-react';
-import { Card } from '@bhabhi/shared';
+import { Card, EmoteId, QuickChatId, GameState } from '@bhabhi/shared';
 import { useMultiplayer } from '../context/MultiplayerContext.js';
 import { useSettings } from '../context/SettingsContext.js';
-import { PlayingCard } from '../components/cards/PlayingCard.js';
+import { audioManager } from '../audio/audioManager.js';
 import { CardHand } from '../components/cards/CardHand.js';
 import { CardBack } from '../components/cards/CardBack.js';
 import { AvatarBadge } from '../components/ui/AvatarBadge.js';
@@ -23,6 +24,12 @@ import { StatusBadge } from '../components/ui/StatusBadge.js';
 import { SuitIcon } from '../components/cards/SuitIcon.js';
 import { Button } from '../components/ui/Button.js';
 import { EventLogDrawer } from '../components/game/EventLogDrawer.js';
+import { EmoteBar } from '../components/game/EmoteBar.js';
+import { EmoteOverlay } from '../components/game/EmoteOverlay.js';
+import { GameSettingsModal } from '../components/game/GameSettingsModal.js';
+import { DealingOverlay } from '../components/game/DealingOverlay.js';
+import { AnimatedTrickPile } from '../components/game/AnimatedTrickPile.js';
+import { ResultModal } from '../components/game/ResultModal.js';
 
 export function MultiplayerGameView() {
   const navigate = useNavigate();
@@ -37,16 +44,35 @@ export function MultiplayerGameView() {
     isConnecting,
     rematchStatus,
     thullaBanner,
+    activeEmotes,
+    activeQuickChats,
     playCard,
     voteRematch,
+    sendEmote,
+    sendQuickChat,
     leaveRoom,
   } = useMultiplayer();
 
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<boolean>(false);
   const [hasVotedRematch, setHasVotedRematch] = useState<boolean>(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [isDealing, setIsDealing] = useState<boolean>(false);
 
-  // If no active game state
+  // Trigger deal sequence on match start (first trick with empty pile)
+  useEffect(() => {
+    if (gameState && gameState.trickNumber === 1 && gameState.currentTrick.length === 0) {
+      setIsDealing(true);
+    }
+  }, [gameState?.trickNumber, gameState?.currentTrick.length]);
+
+  // Reset rematch vote status when new match begins
+  useEffect(() => {
+    if (gameState && gameState.status === 'playing') {
+      setHasVotedRematch(false);
+    }
+  }, [gameState?.status]);
+
   if (!gameState || !room) {
     return (
       <div className="min-h-screen bg-charcoal-950 flex flex-col items-center justify-center p-4">
@@ -82,7 +108,7 @@ export function MultiplayerGameView() {
   const isMyTurn = gameState.currentTurnPlayerId === gameState.myId;
   const legalCardIds = gameState.legalCardIds;
 
-  // Relative seating calculation: local player at bottom (index 0), opponents clockwise
+  // Relative seating calculation: local player at bottom, opponents placed clockwise around table
   const myIndex = gameState.players.findIndex((p) => p.id === gameState.myId);
   const opponents =
     myIndex >= 0
@@ -94,12 +120,18 @@ export function MultiplayerGameView() {
     setSelectedCardId(card.id === selectedCardId ? null : card.id);
   };
 
-  const handlePlayCard = async () => {
-    if (!selectedCardId) return;
-    const res = await playCard(selectedCardId);
+  const handlePlayCard = async (cardIdToPlay?: string) => {
+    const targetCardId = cardIdToPlay || selectedCardId;
+    if (!targetCardId) return;
+    const res = await playCard(targetCardId);
     if (res.success) {
       setSelectedCardId(null);
     }
+  };
+
+  const handleDropCard = (cardId: string) => {
+    if (!legalCardIds.includes(cardId)) return;
+    handlePlayCard(cardId);
   };
 
   const handleCopyCode = () => {
@@ -114,56 +146,94 @@ export function MultiplayerGameView() {
     await voteRematch(true);
   };
 
-  const isGameOver = gameState.status === 'finished';
-  const bhabhiPlayer = isGameOver
-    ? gameState.players.find((p) => p.id === gameState.bhabhiPlayerId)
-    : null;
+  const handleLeaveMatch = async () => {
+    await leaveRoom();
+    navigate('/');
+  };
+
+  const handleReturnToLobby = async () => {
+    await leaveRoom();
+    navigate('/lobby');
+  };
+
+  const leaderPlayer = gameState.players.find((p) => p.id === gameState.currentLeaderPlayerId);
+
+  // Construct dummy GameState for ResultModal compatibility
+  const finishedGameState: GameState = {
+    gameId: gameState.gameId,
+    status: gameState.status,
+    players: gameState.players.map((p) => ({
+      id: p.id,
+      nickname: p.nickname,
+      avatar: p.avatar,
+      cardCount: p.cardCount,
+      hasEscaped: p.hasEscaped,
+      escapeRank: p.escapeRank,
+      isBot: p.isBot,
+      seatIndex: p.seatIndex,
+      hand: [],
+    })),
+    playerOrder: gameState.playerOrder,
+    currentTurnPlayerId: gameState.currentTurnPlayerId,
+    currentLeaderPlayerId: gameState.currentLeaderPlayerId,
+    leadingSuit: gameState.leadingSuit,
+    currentTrick: gameState.currentTrick,
+    discardPile: [],
+    lastTrickResult: gameState.lastTrickResult,
+    escapedPlayerIds: gameState.escapedPlayerIds,
+    bhabhiPlayerId: gameState.bhabhiPlayerId,
+    turnNumber: gameState.turnNumber,
+    trickNumber: gameState.trickNumber,
+    actionHistory: gameState.recentEvents,
+    rulesConfig: {
+      allowThullaOnFirstTrick: true,
+      simultaneousEmptyHandsTieBreak: 'highest_lead_card',
+      maxTricksLimit: 1000,
+    },
+    activeTrickParticipants: [],
+  };
 
   return (
-    <div className="relative min-h-screen bg-charcoal-950 flex flex-col justify-between overflow-hidden select-none">
+    <div className="relative min-h-screen bg-charcoal-950 flex flex-col justify-between overflow-hidden select-none touch-manipulation">
       {/* Top Header */}
-      <header className="relative z-30 w-full bg-charcoal-900/90 border-b border-charcoal-800 px-3 sm:px-6 py-2.5 flex items-center justify-between backdrop-blur-md">
-        {/* Left: Leave & Room Code */}
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={async () => {
-              await leaveRoom();
-              navigate('/');
-            }}
-            className="flex items-center space-x-1.5 text-xs text-gray-300 hover:text-white bg-charcoal-800 hover:bg-charcoal-700 px-2.5 py-1.5 rounded-lg border border-charcoal-700 transition-colors"
-            title="Leave Match"
-          >
-            <LogOut className="w-3.5 h-3.5 text-ruby-400" />
-            <span className="hidden sm:inline">Leave</span>
-          </button>
-
+      <header className="relative z-30 w-full bg-charcoal-900/95 border-b border-charcoal-800 px-3 sm:px-6 py-2 flex items-center justify-between backdrop-blur-md">
+        {/* Left: Room Code & Quick Reaction Trigger */}
+        <div className="flex items-center space-x-2 sm:space-x-3">
           <button
             onClick={handleCopyCode}
-            className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-charcoal-800 hover:bg-charcoal-700 border border-charcoal-700 text-xs text-gold-300 font-mono transition-colors"
+            className="flex items-center space-x-1.5 px-2.5 py-1 rounded-xl bg-charcoal-800 hover:bg-charcoal-700 border border-charcoal-700 text-xs text-gold-300 font-mono transition-colors shadow-sm"
             title="Click to copy room code"
+            aria-label="Copy room code"
           >
             <Users className="w-3.5 h-3.5 text-gold-400" />
-            <span>Room {room.roomCode}</span>
+            <span className="font-bold tracking-wide">Room {room.roomCode}</span>
             {copiedCode ? (
               <Check className="w-3 h-3 text-emerald-400" />
             ) : (
               <Copy className="w-3 h-3 text-gray-400" />
             )}
           </button>
+
+          {/* Emote & Quick Chat Bar */}
+          <EmoteBar
+            onSendEmote={(emoteId: EmoteId) => sendEmote(emoteId)}
+            onSendQuickChat={(chatId: QuickChatId) => sendQuickChat(chatId)}
+            disabled={isPaused}
+          />
         </div>
 
-        {/* Center: Trick Status & Leading Suit */}
+        {/* Center: Trick Status & Lead Suit Pill */}
         <div className="flex items-center space-x-2">
           {gameState.leadingSuit ? (
             <div className="flex items-center space-x-1.5 bg-felt-900 border border-gold-500/50 px-3 py-1 rounded-full text-xs shadow-md">
-              <span className="text-gray-300">Lead Suit:</span>
+              <span className="text-gray-300 hidden sm:inline">Lead Suit:</span>
               <span className="font-bold text-cream-100 flex items-center space-x-1">
                 <SuitIcon suit={gameState.leadingSuit} size={14} />
                 <span className="capitalize">{gameState.leadingSuit}</span>
               </span>
             </div>
           ) : (
-            <div className="px-3 py-1 rounded-full bg-charcoal-800 border border-charcoal-700 text-xs text-gray-400">
+            <div className="px-3 py-1 rounded-full bg-charcoal-800 border border-charcoal-700 text-xs text-gray-300 font-medium">
               {gameState.trickNumber === 1 ? '♠ Ace of Spades Opening' : 'New Trick Leading'}
             </div>
           )}
@@ -171,6 +241,7 @@ export function MultiplayerGameView() {
 
         {/* Right: Controls & Connection Status */}
         <div className="flex items-center space-x-2">
+          {/* Connection Indicator */}
           <div
             className={`w-2.5 h-2.5 rounded-full ${
               isConnected ? 'bg-emerald-400 ring-2 ring-emerald-400/20' : 'bg-ruby-500 animate-ping'
@@ -178,10 +249,16 @@ export function MultiplayerGameView() {
             title={isConnected ? 'Connected to Multiplayer Server' : 'Reconnecting...'}
           />
 
+          {/* Sound Toggle */}
           <button
-            onClick={() => updateSettings({ soundEnabled: !settings.soundEnabled })}
+            onClick={() => {
+              const nextState = !settings.soundEnabled;
+              updateSettings({ soundEnabled: nextState });
+              if (nextState) audioManager.playButtonClick();
+            }}
             className="p-1.5 rounded-lg bg-charcoal-800 text-gray-300 hover:text-white border border-charcoal-700"
             title={settings.soundEnabled ? 'Mute Sound' : 'Enable Sound'}
+            aria-label="Toggle sound"
           >
             {settings.soundEnabled ? (
               <Volume2 className="w-4 h-4 text-emerald-400" />
@@ -190,10 +267,21 @@ export function MultiplayerGameView() {
             )}
           </button>
 
+          {/* Settings Modal Trigger */}
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="p-1.5 rounded-lg bg-charcoal-800 text-gray-300 hover:text-white border border-charcoal-700"
+            title="Game Settings"
+            aria-label="Game Settings"
+          >
+            <Sliders className="w-4 h-4 text-gold-400" />
+          </button>
+
           <Link
             to="/rules"
             className="p-1.5 rounded-lg bg-charcoal-800 text-gray-300 hover:text-white border border-charcoal-700"
             title="How to Play"
+            aria-label="How to play"
           >
             <HelpCircle className="w-4 h-4" />
           </Link>
@@ -202,7 +290,7 @@ export function MultiplayerGameView() {
 
       {/* Disconnect Pause Banner */}
       {isPaused && (
-        <div className="relative z-40 bg-ruby-950/90 border-b border-ruby-600 px-4 py-2.5 text-center flex items-center justify-center space-x-3 text-cream-100 text-xs shadow-lg animate-pulse">
+        <div className="relative z-40 bg-ruby-950/90 border-b border-ruby-600 px-4 py-2 text-center flex items-center justify-center space-x-3 text-cream-100 text-xs shadow-lg animate-pulse">
           <AlertTriangle className="w-4 h-4 text-ruby-400 flex-shrink-0" />
           <span>
             <strong>Match Paused:</strong> {pauseReason || 'Waiting for disconnected player...'}
@@ -218,12 +306,12 @@ export function MultiplayerGameView() {
       {/* Main Playing Table */}
       <main className="relative flex-1 w-full max-w-7xl mx-auto p-2 sm:p-4 flex flex-col justify-between items-center overflow-hidden">
         {/* Felt Oval Table Surface */}
-        <div className="relative w-full h-full min-h-[460px] sm:min-h-[520px] rounded-[40px] sm:rounded-[80px] felt-table flex flex-col justify-between p-4 sm:p-8 overflow-hidden shadow-felt-inset">
-          {/* Inner Stitch Border */}
-          <div className="absolute inset-3 sm:inset-5 rounded-[30px] sm:rounded-[70px] felt-stitch pointer-events-none" />
+        <div className="relative w-full h-full min-h-[440px] sm:min-h-[500px] rounded-[36px] sm:rounded-[70px] felt-table flex flex-col justify-between p-3 sm:p-6 overflow-hidden shadow-felt-inset">
+          {/* Inner Golden Stitch Border Line */}
+          <div className="absolute inset-2 sm:inset-4 rounded-[28px] sm:rounded-[60px] felt-stitch pointer-events-none" />
 
           {/* Opponents Positioning Ring */}
-          <div className="relative z-10 w-full flex items-center justify-around gap-2 pt-2">
+          <div className="relative z-10 w-full flex items-center justify-around gap-2 pt-1 sm:pt-2">
             {opponents.map((opp) => {
               const isInTurn = gameState.currentTurnPlayerId === opp.id;
               const isDisconnected = !room.players.find((p) => p.id === opp.id)?.isConnected;
@@ -231,7 +319,7 @@ export function MultiplayerGameView() {
               return (
                 <div
                   key={opp.id}
-                  className={`flex flex-col items-center space-y-1 transition-all duration-300 ${
+                  className={`relative flex flex-col items-center space-y-1 transition-all duration-300 ${
                     isInTurn
                       ? 'scale-105 filter drop-shadow-[0_0_15px_rgba(212,175,55,0.7)]'
                       : opp.hasEscaped
@@ -239,6 +327,13 @@ export function MultiplayerGameView() {
                       : 'opacity-90'
                   }`}
                 >
+                  {/* Floating Emote / Quick Chat Overlay */}
+                  <EmoteOverlay
+                    playerId={opp.id}
+                    activeEmotes={activeEmotes}
+                    activeQuickChats={activeQuickChats}
+                  />
+
                   {/* Opponent Avatar with Turn Ring */}
                   <div className="relative">
                     <AvatarBadge avatarId={opp.avatar} size="md" />
@@ -262,8 +357,9 @@ export function MultiplayerGameView() {
                       {opp.nickname}
                     </span>
                     {opp.hasEscaped ? (
-                      <span className="text-[9px] font-bold text-emerald-400 mt-0.5">
-                        Escaped #{opp.escapeRank} ✓
+                      <span className="text-[9px] font-bold text-emerald-400 mt-0.5 flex items-center space-x-1">
+                        <Sparkles className="w-2.5 h-2.5 text-emerald-400" />
+                        <span>Escaped #{opp.escapeRank}</span>
                       </span>
                     ) : isInTurn ? (
                       <span className="text-[9px] font-bold text-gold-400 mt-0.5 flex items-center space-x-1">
@@ -287,79 +383,52 @@ export function MultiplayerGameView() {
           </div>
 
           {/* Central Trick Pile & Thulla Alert */}
-          <div className="relative z-10 flex-1 flex flex-col items-center justify-center my-4 sm:my-8">
-            {/* Live Thulla Alert Notification */}
+          <div className="relative z-10 flex-1 flex flex-col items-center justify-center my-3 sm:my-6">
+            {/* Live Thulla Alert Notification Banner */}
             {thullaBanner && (
-              <div className="absolute z-30 flex items-center space-x-2 px-4 py-2 rounded-2xl bg-ruby-950/95 border-2 border-ruby-500 shadow-2xl animate-bounce">
-                <Flame className="w-5 h-5 text-ruby-400" />
+              <div className="absolute z-30 flex items-center space-x-2 px-5 py-2.5 rounded-2xl bg-ruby-950/95 border-2 border-ruby-500 shadow-2xl animate-bounce">
+                <Flame className="w-6 h-6 text-ruby-400 animate-pulse" />
                 <div className="text-center">
-                  <p className="text-sm font-black text-ruby-300 tracking-wider">
+                  <p className="text-base font-black text-ruby-300 tracking-wider">
                     THULLA!
                   </p>
                   <p className="text-xs text-cream-100">
-                    A Thulla was played! Pile collected!
+                    Penalty pile collected!
                   </p>
                 </div>
               </div>
             )}
 
-            {/* Trick Cards Container */}
-            <div className="relative w-48 h-36 sm:w-56 sm:h-44 flex items-center justify-center">
-              {gameState.currentTrick.length === 0 ? (
-                <div className="text-center p-4 rounded-2xl border-2 border-dashed border-gold-500/20 bg-charcoal-950/30">
-                  <p className="text-xs text-gold-300/80 font-medium">Trick Empty</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">
-                    {isMyTurn ? 'Your lead! Play any card' : 'Waiting for lead card...'}
-                  </p>
-                </div>
-              ) : (
-                gameState.currentTrick.map((item, idx) => {
-                  const player = gameState.players.find((p) => p.id === item.playerId);
-                  const isLastCard = idx === gameState.currentTrick.length - 1;
-                  const isThullaPlay =
-                    gameState.leadingSuit && item.card.suit !== gameState.leadingSuit;
-                  const rotation = (idx % 2 === 0 ? 1 : -1) * (idx * 8 + 4);
-
-                  return (
-                    <div
-                      key={`${item.card.id}-${idx}`}
-                      className="absolute transition-all duration-300 animate-scale-up"
-                      style={{
-                        transform: `rotate(${rotation}deg) translate(${idx * 4}px, ${idx * 2}px)`,
-                        zIndex: idx + 10,
-                      }}
-                    >
-                      <PlayingCard
-                        card={item.card}
-                        size="md"
-                        isHighlighted={isLastCard && !!isThullaPlay}
-                      />
-                      <span
-                        className={`absolute -bottom-2 left-1/2 -translate-x-1/2 text-[9px] px-1.5 py-0.2 rounded border shadow whitespace-nowrap ${
-                          isThullaPlay
-                            ? 'bg-ruby-950 text-ruby-300 border-ruby-500 font-bold'
-                            : 'bg-charcoal-950 text-gold-300 border-charcoal-800'
-                        }`}
-                      >
-                        {player?.nickname || item.playerId}
-                      </span>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+            {/* Central Animated Trick Container */}
+            <AnimatedTrickPile
+              trickCards={gameState.currentTrick}
+              leadingSuit={gameState.leadingSuit}
+              isMyTurn={isMyTurn}
+              onDropCard={handleDropCard}
+              getPlayerNickname={(id) => {
+                const found = gameState.players.find((p) => p.id === id);
+                return found?.nickname || id;
+              }}
+            />
           </div>
 
           {/* Local Human Player Info Bar */}
           <div className="relative z-10 w-full flex items-center justify-between px-2 pt-2 border-t border-gold-500/20">
-            <div className="flex items-center space-x-2">
+            <div className="relative flex items-center space-x-2">
+              {/* Local Player Floating Emote / Chat */}
+              <EmoteOverlay
+                playerId={gameState.myId}
+                activeEmotes={activeEmotes}
+                activeQuickChats={activeQuickChats}
+              />
+
               <AvatarBadge avatarId={settings.avatar} size="sm" />
               <div>
                 <div className="flex items-center space-x-2">
                   <span className="text-xs font-bold text-cream-100">
                     {settings.nickname} (You)
                   </span>
-                  {isMyTurn && <StatusBadge type="turn" label="Your Turn!" />}
+                  {isMyTurn && <StatusBadge type="turn" label="YOUR TURN" />}
                 </div>
                 <p className="text-[10px] text-gray-300">
                   {gameState.myHand.length} cards remaining • Trick #{gameState.trickNumber}
@@ -372,25 +441,27 @@ export function MultiplayerGameView() {
               variant="gold"
               size="sm"
               disabled={!isMyTurn || !selectedCardId || isPaused}
-              onClick={handlePlayCard}
-              className="font-bold tracking-wider"
+              onClick={() => handlePlayCard()}
+              className="font-bold tracking-wider px-4 sm:px-6 shadow-lg"
             >
               Play Card
             </Button>
           </div>
         </div>
 
-        {/* Local Player's Interactive Hand */}
+        {/* Local Player's Interactive Hand with Large Hand Support */}
         <div className="relative z-20 w-full max-w-5xl mt-[-20px] sm:mt-[-30px]">
           <CardHand
             cards={gameState.myHand}
             selectedCardId={selectedCardId}
             onSelectCard={handleSelectCard}
+            onPlayCard={(card) => handlePlayCard(card.id)}
             disabledCardIds={gameState.myHand
               .filter((c) => !legalCardIds.includes(c.id))
               .map((c) => c.id)}
             highlightedCardIds={legalCardIds}
             size={settings.cardSize === 'compact' ? 'sm' : settings.cardSize === 'large' ? 'lg' : 'md'}
+            isDraggable={isMyTurn && !isPaused}
           />
         </div>
       </main>
@@ -398,81 +469,33 @@ export function MultiplayerGameView() {
       {/* Activity Log Drawer */}
       <EventLogDrawer events={gameState.recentEvents} />
 
-      {/* Game Finished Modal */}
-      {isGameOver && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-charcoal-950/80 backdrop-blur-sm">
-          <div className="max-w-md w-full bg-charcoal-850 border border-charcoal-700/80 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6 text-center">
-            <div>
-              <span className="inline-block px-3 py-1 rounded-full bg-ruby-500/20 text-ruby-400 border border-ruby-500/40 text-xs font-bold uppercase tracking-wider mb-2">
-                Match Concluded
-              </span>
-              <h2 className="text-2xl font-black font-display text-cream-100">
-                {bhabhiPlayer?.nickname} is the Bhabhi!
-              </h2>
-              <p className="text-xs text-gray-400 mt-1">
-                The last player holding cards lost the match.
-              </p>
-            </div>
+      {/* Card Dealing Animation Overlay */}
+      <DealingOverlay
+        isDealing={isDealing}
+        playerCount={gameState.players.length}
+        leaderNickname={leaderPlayer?.nickname}
+        onDealComplete={() => setIsDealing(false)}
+      />
 
-            {/* Escaped Ranking List */}
-            <div className="space-y-2 bg-charcoal-900 p-3 rounded-xl border border-charcoal-800 text-left">
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                Finishing Order
-              </p>
-              {gameState.players
-                .filter((p) => p.hasEscaped)
-                .sort((a, b) => (a.escapeRank || 0) - (b.escapeRank || 0))
-                .map((p) => (
-                  <div key={p.id} className="flex items-center justify-between text-xs py-1">
-                    <span className="text-cream-100 flex items-center space-x-2">
-                      <span className="text-gold-400 font-bold">#{p.escapeRank}</span>
-                      <span>{p.nickname}</span>
-                    </span>
-                    <span className="text-emerald-400 font-semibold">Escaped ✓</span>
-                  </div>
-                ))}
-              {bhabhiPlayer && (
-                <div className="flex items-center justify-between text-xs py-1 border-t border-charcoal-800">
-                  <span className="text-ruby-300 flex items-center space-x-2">
-                    <span className="text-ruby-400 font-bold">BHABHI</span>
-                    <span>{bhabhiPlayer.nickname}</span>
-                  </span>
-                  <span className="text-ruby-400 font-bold">Remaining in Hand</span>
-                </div>
-              )}
-            </div>
+      {/* In-Game Settings Modal */}
+      <GameSettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onLeaveGame={handleLeaveMatch}
+        isMultiplayer={true}
+      />
 
-            {/* Rematch Voting Section */}
-            <div className="space-y-3">
-              <p className="text-xs text-gray-400">
-                {rematchStatus?.approvals.length || 0} of {rematchStatus?.totalRequired || room.players.length} players voted for a rematch
-              </p>
-
-              <div className="flex justify-center space-x-3">
-                <Button
-                  variant="gold"
-                  size="md"
-                  disabled={hasVotedRematch}
-                  onClick={handleRematchClick}
-                  leftIcon={<RefreshCw className="w-4 h-4" />}
-                >
-                  {hasVotedRematch ? 'Voted for Rematch ✓' : 'Vote Rematch'}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="md"
-                  onClick={async () => {
-                    await leaveRoom();
-                    navigate('/');
-                  }}
-                >
-                  Leave
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Game Finished Bhabhi Result Modal */}
+      <ResultModal
+        isOpen={gameState.status === 'finished'}
+        gameState={finishedGameState}
+        onPlayAgain={handleRematchClick}
+        humanPlayerId={gameState.myId}
+        isMultiplayer={true}
+        rematchStatus={rematchStatus}
+        hasVotedRematch={hasVotedRematch}
+        onReturnToLobby={handleReturnToLobby}
+      />
     </div>
   );
 }

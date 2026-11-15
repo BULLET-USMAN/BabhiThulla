@@ -31,12 +31,16 @@ describe('MultiplayerGameView Component', () => {
       rematchStatus: null,
       lastTrickResult: null,
       thullaBanner: null,
+      activeEmotes: [],
+      activeQuickChats: [],
       createRoom: vi.fn(),
       joinRoom: vi.fn(),
       toggleReady: vi.fn(),
       startGame: vi.fn(),
       playCard: vi.fn(),
       voteRematch: vi.fn(),
+      sendEmote: vi.fn(),
+      sendQuickChat: vi.fn(),
       leaveRoom: vi.fn(),
       reconnect: vi.fn(),
     });
@@ -159,12 +163,16 @@ describe('MultiplayerGameView Component', () => {
       rematchStatus: null,
       lastTrickResult: null,
       thullaBanner: null,
+      activeEmotes: [],
+      activeQuickChats: [],
       createRoom: vi.fn(),
       joinRoom: vi.fn(),
       toggleReady: vi.fn(),
       startGame: vi.fn(),
       playCard: vi.fn(),
       voteRematch: vi.fn(),
+      sendEmote: vi.fn(),
+      sendQuickChat: vi.fn(),
       leaveRoom: vi.fn(),
       reconnect: vi.fn(),
     };
@@ -184,7 +192,7 @@ describe('MultiplayerGameView Component', () => {
     expect(screen.getByText(/room live99/i)).toBeInTheDocument();
     expect(screen.getByText('Opponent1')).toBeInTheDocument();
     expect(screen.getByText('Opponent2')).toBeInTheDocument();
-    expect(screen.getByText(/your turn!/i)).toBeInTheDocument();
+    expect(screen.getByText(/your turn/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /play card/i })).toBeInTheDocument();
   });
 
@@ -273,12 +281,16 @@ describe('MultiplayerGameView Component', () => {
       rematchStatus: null,
       lastTrickResult: null,
       thullaBanner: null,
+      activeEmotes: [],
+      activeQuickChats: [],
       createRoom: vi.fn(),
       joinRoom: vi.fn(),
       toggleReady: vi.fn(),
       startGame: vi.fn(),
       playCard: vi.fn(),
       voteRematch: vi.fn(),
+      sendEmote: vi.fn(),
+      sendQuickChat: vi.fn(),
       leaveRoom: vi.fn(),
       reconnect: vi.fn(),
     };

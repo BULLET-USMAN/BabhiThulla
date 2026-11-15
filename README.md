@@ -50,35 +50,83 @@ BhabhiThulla/
 │           │   ├── botStrategy.ts     # Offline AI decision maker
 │           │   └── simulation.test.ts # 1,000 automated end-to-end match simulations
 │           ├── models/         # Card, Suit, Rank, PlayerProfile, RoomConfig
+│           ├── protocol/       # WebSocket event contracts, payloads, and validations
 │           └── utils/          # Validation and deck helpers
 ├── apps/
 │   ├── web/                    # React 18, Vite, TypeScript, Tailwind CSS
 │   │   └── src/
-│   │       ├── hooks/          # usePracticeGame (turn scheduler & event coordinator)
-│   │       ├── components/     # PlayingCard, CardHand, ResultModal, EventLogDrawer, etc.
-│   │       ├── views/          # PracticeGameView, GameTablePreviewView, HomeView, etc.
-│   │       └── services/       # Web Audio API sound synthesizer
+│   │       ├── animations/     # AnimationQueue & deterministic visual transitions
+│   │       ├── audio/          # Procedural Web Audio API sound synthesizer
+│   │       ├── context/        # MultiplayerContext, SettingsContext, ToastContext
+│   │       ├── hooks/          # usePracticeGame, useGameAudio
+│   │       ├── components/     # PlayingCard, CardHand, EmoteBar, EmoteOverlay, DealingOverlay, etc.
+│   │       ├── views/          # MultiplayerGameView, PracticeGameView, HomeView, etc.
+│   │       └── services/       # Socket.IO client, SoundService
 │   └── server/                 # Express, Node.js, TypeScript backend
 │       └── src/
 │           ├── app.ts          # Express app, health checks (/api/health, /api/version)
-│           └── index.ts        # Graceful shutdown & lifecycle management
+│           ├── socket/         # Socket.IO handlers (room, gameplay, reactions, disconnect)
+│           ├── rooms/          # RoomManager, Room, SessionStore
+│           └── security/       # Rate limiting, payload validation (Zod)
 ├── e2e/                        # Playwright end-to-end browser tests
 └── README.md
 ```
 
 ---
 
-## 🤖 Playable Practice Mode (vs Bots)
+## 🎮 Game Modes
 
-Phase 2 introduces a completely playable, offline **Play vs Bots** mode directly from the home screen:
-- **Player Counts**: Choose from 3, 4, 5, or 6 players (1 human + 2 to 5 bots).
-- **Authoritative Engine**: Driven entirely by the pure TypeScript game engine.
-- **Fair Bot AI**: Bots inspect only their own legal moves and public table cards—they **never** peek at other players' private hands.
-- **Visual Feedback**:
-  - Valid playable cards are highlighted with a gold elevation ring; illegal cards are dimmed with tooltips explaining why they cannot be played.
-  - Animated Thulla banner notifying who gave Thulla and who collects the pile.
-  - Interactive activity panel tracking every card play, Thulla, and escape.
-  - Fun end-game modal ("BHABHI MIL GAYI!") displaying the finishing order and rematch button.
+### 1. Online Real-Time Multiplayer
+- **Private Rooms**: Create private rooms with custom player limits (3 to 6 players, defaulting to 4).
+- **Invitation Links & Codes**: Join seamlessly via 6-character room codes (`ROOM_CODE_REGEX = /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/`) or direct invitation links.
+- **Strict Privacy**: Server only transmits private hands to their verified owners; opponents receive card counts and card backs.
+- **Graceful Reconnection**: Disconnects trigger a 120-second match pause. Reconnecting players restore their exact seat, hand, and turn state using secure session tokens.
+- **Rematch Voting**: Synchronized rematch voting enables back-to-back matches without leaving the room.
+
+### 2. Offline Practice Mode (vs Bots)
+- Fully functional offline play against rule-abiding computer opponents.
+- Fair AI that only inspects its legal moves and public table state.
+- Interactive bot reactions: Bots celebrate Thullas, mourn penalty collections, and applaud escapes!
+
+---
+
+## ✨ Phase 4: Premium Experience & Polish
+
+### 🎨 Visual Effects & Animation Subsystem
+- **Deterministic Animation Queue**: Visual transitions (`AnimationQueue`) decoupled from authoritative engine results. Stale animations are discarded automatically on server updates.
+- **Card Dealing Sequence**: Realistic clockwise deal with shuffle flutter sound and skippable prompt.
+- **Dramatic Thulla Alert**: Highlighting the off-suit play, marking the highest lead card, bouncing "THULLA!" overlay, and animating pile collection.
+- **Trick Resolution & Discard**: Clear winner indicator and smooth card sweep into discard pile.
+- **Celebration & Defeat**: "Escaped #X" rank badge upon safe exit; "BHABHI MIL GAYI!" crown screen on match finish.
+
+### 🔊 Procedural Web Audio API Sound System
+Synthesized in real-time with zero external audio assets:
+- Card Select (subtle high-pitch click)
+- Card Play (tactile felt thump)
+- Card Deal (rapid card slide)
+- Shuffle Flutter (multi-frequency flutter)
+- Trick Sweep (whoosh)
+- **Thulla Impact** (brass strike + sub-bass punch)
+- Pile Collect (ascending scoop)
+- Player Escape (triumphant 4-tone arpeggio)
+- Bhabhi Finish (playful minor trombone sting)
+- Player Joined, Button Click, Rematch Chime, Emote Pop
+
+### 💬 Live Emotes & Quick Chat
+- **Real-time Reactions**: 8 animated emojis (`😂`, `😎`, `😱`, `😭`, `👏`, `💀`, `🔥`, `❤️`).
+- **Quick Chat Messages**: 8 pre-scripted phrases ("THULLA!", "Nice move!", "You're next!", "Good game!", "Let's go!", "Oops!", "Play faster!", "Rematch?").
+- Rate-limited sliding window (5 per 3 seconds in production) and mute settings.
+
+### 🃏 Large Hand Adaptive Support
+When penalty Thulla piles grow hands to 20–30+ cards:
+- Dynamic overlap spacing (`-space-x-8 sm:-space-x-12 md:-space-x-14`).
+- Horizontal smooth scrolling with dedicated Chevron buttons.
+- Drag-and-drop and double-click to play directly into the trick pile.
+
+### 📱 Responsive & Accessible Design
+- Optimized for mobile portrait (375px+), mobile landscape, tablet, and desktop viewports.
+- Touch-friendly 44px+ hitboxes and safe-area insets.
+- WCAG AA contrast compliance and `reduced-motion` support.
 
 ---
 
@@ -87,41 +135,21 @@ Phase 2 introduces a completely playable, offline **Play vs Bots** mode directly
 | Command | Description |
 | :--- | :--- |
 | `npm run dev` | Starts the Vite frontend web server at `http://localhost:5173` |
-| `npm run dev:all` | Concurrently runs both the backend server (`:3001`) and frontend (`:5173`) |
+| `npm run dev:all` | Concurrently runs backend server (`:3001`) and frontend (`:5173`) |
 | `npm run build` | Compiles `@bhabhi/shared`, `@bhabhi/server`, and `@bhabhi/web` |
 | `npm run typecheck` | Validates strict TypeScript types across all workspaces |
 | `npm run lint` | Runs ESLint across all packages and apps |
-| `npm test` | Runs all 71 Vitest tests (including 1,000 automated game simulations) |
+| `npm test` | Runs all 108 unit and integration tests across 24 suites |
 | `npm run test:e2e` | Runs Playwright browser tests across Desktop and Mobile viewports |
 
 ---
 
 ## 📦 Phase Status & Roadmap
 
-### ✅ Phase 1: Foundation & UI Design System
-- Monorepo workspace initialization (`apps/web`, `apps/server`, `packages/shared`).
-- Standard 52-card SVG component system, emerald felt table geometry, and responsive views.
-- Local guest profile persistence (nickname and 8 avatars).
-
-### ✅ Phase 2: Game Engine & Playable Practice Mode (Completed)
-- [x] Pure TypeScript Bhabhi Thulla game engine in `packages/shared/src/game/`.
-- [x] Cryptographically secure shuffling (`crypto.getRandomValues`) and deterministic seeded PRNG for testing.
-- [x] Clockwise dealing for 3, 4, 5, and 6 players.
-- [x] Ace of Spades opening rule enforcement.
-- [x] Strict suit-following validation (`getLegalMoves`, `isLegalMove`).
-- [x] Automatic Thulla detection and pile collection by highest leading-suit card.
-- [x] Clean trick resolution and discard pile management.
-- [x] Player escape detection, skipping escaped seats, and Bhabhi declaration.
-- [x] 52-card conservation invariant checks after every state transition.
-- [x] **1,000 automated match simulations** across 3–6 player counts with 100% termination and 0 violations.
-- [x] Fully playable offline practice mode (`/practice`) with bot turn scheduler and Thulla alerts.
-- [x] End-game modal ("BHABHI MIL GAYI!") with finishing rankings and instant rematch.
-
-### ⏳ Phase 3: Server-Authoritative Online Multiplayer (Upcoming)
-- Socket.IO multiplayer rooms and 6-character room codes.
-- WebSocket message contracts and state synchronization.
-- Server-authoritative card dealing with hidden hands masked from clients.
-- Session recovery tokens for seamless reconnection upon browser refresh.
+- [x] **Phase 1: Project Foundation & UI Design System**
+- [x] **Phase 2: Complete Game Engine & Playable Practice Mode**
+- [x] **Phase 3: Real-Time Online Multiplayer & Private Rooms**
+- [x] **Phase 4: Premium Gameplay Experience, Animations, Audio & Emotes**
 
 ---
 

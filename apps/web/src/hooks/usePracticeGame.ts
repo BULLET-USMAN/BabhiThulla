@@ -9,7 +9,7 @@ import {
   GameEvent,
   AvatarId,
 } from '@bhabhi/shared';
-import { soundService } from '../services/sound.js';
+import { audioManager } from '../audio/audioManager.js';
 import { useToast } from '../context/ToastContext.js';
 
 export interface UsePracticeGameOptions {
@@ -104,7 +104,7 @@ export function usePracticeGame({
     setIsBotThinking(false);
     const freshGame = initGame();
     setGameState(freshGame);
-    soundService.playCardPlay();
+    audioManager.playShuffle();
     showToast('Fresh match started! Ace of Spades leads.', 'success');
   }, [initGame, showToast]);
 
@@ -116,9 +116,9 @@ export function usePracticeGame({
       if (events) {
         for (const ev of events) {
           if (ev.type === 'THULLA_OCCURRED') {
-            soundService.playThulla();
+            audioManager.playThulla();
           } else if (ev.type === 'PILE_COLLECTED') {
-            soundService.playCollectPile();
+            audioManager.playPileCollect();
             const collector = nextState.players.find((p) => p.id === ev.playerId);
             const thullaEvent = events.find((e) => e.type === 'THULLA_OCCURRED');
             const thullaPlayer = nextState.players.find((p) => p.id === thullaEvent?.playerId);
@@ -133,11 +133,14 @@ export function usePracticeGame({
               setThullaAlert(null);
             }, 3000);
           } else if (ev.type === 'CARD_PLAYED') {
-            soundService.playCardPlay();
+            audioManager.playCardPlay();
+          } else if (ev.type === 'TRICK_RESOLVED') {
+            audioManager.playTrickSweep();
           } else if (ev.type === 'PLAYER_ESCAPED') {
+            audioManager.playEscapeFanfare();
             showToast(`${ev.message}`, 'success');
           } else if (ev.type === 'BHABHI_DECLARED') {
-            soundService.playThulla();
+            audioManager.playBhabhiDefeat();
           }
         }
       }

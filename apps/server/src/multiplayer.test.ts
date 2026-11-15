@@ -416,4 +416,64 @@ describe('Real-Time Multiplayer Integration Tests', () => {
 
     sockets.forEach((s) => s.disconnect());
   });
+
+  it('validates and broadcasts emotes and quick chat messages to room members', async () => {
+    const s1 = createClient();
+    const s2 = createClient();
+
+    const hostRes = await new Promise<ActionAckResponse<RoomCreatedResponse>>((resolve) => {
+      s1.emit('room:create', { nickname: 'EmoteHost', avatar: 'avatar-1', maxPlayers: 3 }, resolve);
+    });
+    const roomCode = hostRes.data!.room.roomCode;
+    const p1Id = hostRes.data!.credentials.playerId;
+
+    await new Promise((resolve) => {
+      s2.emit('room:join', { roomCode, nickname: 'EmoteP2', avatar: 'avatar-2' }, resolve);
+    });
+
+    // 1. Send valid emote
+    const emotePromise = new Promise<{ playerId: string; emoteId: string; symbol: string }>((resolve) => {
+      s2.on('player:emote', resolve);
+    });
+
+    const sendEmoteAck = await new Promise<ActionAckResponse>((resolve) => {
+      s1.emit('room:emote', { roomCode, emoteId: 'fire' }, resolve);
+    });
+    expect(sendEmoteAck.success).toBe(true);
+
+    const receivedEmote = await emotePromise;
+    expect(receivedEmote.playerId).toBe(p1Id);
+    expect(receivedEmote.emoteId).toBe('fire');
+    expect(receivedEmote.symbol).toBe('🔥');
+
+    // 2. Reject invalid emote
+    const invalidEmoteAck = await new Promise<ActionAckResponse>((resolve) => {
+      s1.emit('room:emote', { roomCode, emoteId: 'not_an_emote' }, resolve);
+    });
+    expect(invalidEmoteAck.success).toBe(false);
+
+    // 3. Send valid quick chat
+    const chatPromise = new Promise<{ playerId: string; messageId: string; text: string }>((resolve) => {
+      s2.on('player:quick-chat', resolve);
+    });
+
+    const sendChatAck = await new Promise<ActionAckResponse>((resolve) => {
+      s1.emit('room:quick-chat', { roomCode, messageId: 'thulla' }, resolve);
+    });
+    expect(sendChatAck.success).toBe(true);
+
+    const receivedChat = await chatPromise;
+    expect(receivedChat.playerId).toBe(p1Id);
+    expect(receivedChat.messageId).toBe('thulla');
+    expect(receivedChat.text).toBe('THULLA!');
+
+    // 4. Reject invalid quick chat
+    const invalidChatAck = await new Promise<ActionAckResponse>((resolve) => {
+      s1.emit('room:quick-chat', { roomCode, messageId: 'hack_the_game' }, resolve);
+    });
+    expect(invalidChatAck.success).toBe(false);
+
+    s1.disconnect();
+    s2.disconnect();
+  });
 });

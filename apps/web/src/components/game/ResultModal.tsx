@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
-import { Skull, Trophy, RotateCcw, Home } from 'lucide-react';
-import { GameState } from '@bhabhi/shared';
+import { Skull, Trophy, RotateCcw, Home, Users } from 'lucide-react';
+import { GameState, RematchStatusPayload } from '@bhabhi/shared';
 import { Modal } from '../ui/Modal.js';
 import { Button } from '../ui/Button.js';
 import { AvatarBadge } from '../ui/AvatarBadge.js';
@@ -10,6 +10,10 @@ export interface ResultModalProps {
   gameState: GameState;
   onPlayAgain: () => void;
   humanPlayerId?: string;
+  isMultiplayer?: boolean;
+  rematchStatus?: RematchStatusPayload | null;
+  hasVotedRematch?: boolean;
+  onReturnToLobby?: () => void;
 }
 
 export function ResultModal({
@@ -17,6 +21,10 @@ export function ResultModal({
   gameState,
   onPlayAgain,
   humanPlayerId = 'human-player',
+  isMultiplayer = false,
+  rematchStatus,
+  hasVotedRematch = false,
+  onReturnToLobby,
 }: ResultModalProps) {
   if (!isOpen || gameState.status !== 'finished' || !gameState.bhabhiPlayerId) {
     return null;
@@ -54,7 +62,7 @@ export function ResultModal({
           </p>
           {isHumanBhabhi ? (
             <span className="inline-block mt-2 px-3 py-1 rounded-full text-xs font-bold bg-ruby-900/60 text-ruby-300 border border-ruby-500/40">
-              Better luck next round! You were caught with cards.
+              Better luck next round! You were caught holding cards.
             </span>
           ) : (
             <span className="inline-block mt-2 px-3 py-1 rounded-full text-xs font-bold bg-emerald-900/60 text-emerald-300 border border-emerald-500/40">
@@ -109,26 +117,50 @@ export function ResultModal({
           </div>
         </div>
 
+        {/* Multiplayer Rematch Status Tally */}
+        {isMultiplayer && (
+          <p className="text-xs text-gold-300 font-medium">
+            Rematch votes: {rematchStatus?.approvals.length || 0} / {rematchStatus?.totalRequired || gameState.players.length} players
+          </p>
+        )}
+
         {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full pt-2">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 w-full pt-2">
           <Button
             variant="gold"
-            size="lg"
+            size="md"
             fullWidth
+            disabled={isMultiplayer && hasVotedRematch}
             onClick={onPlayAgain}
             leftIcon={<RotateCcw className="w-4 h-4" />}
           >
-            Play Again
+            {isMultiplayer
+              ? hasVotedRematch
+                ? 'Voted for Rematch ✓'
+                : 'Vote Rematch'
+              : 'Play Again'}
           </Button>
+
+          {onReturnToLobby && (
+            <Button
+              variant="outline"
+              size="md"
+              fullWidth
+              onClick={onReturnToLobby}
+              leftIcon={<Users className="w-4 h-4" />}
+            >
+              Return to Lobby
+            </Button>
+          )}
 
           <Link to="/" className="w-full">
             <Button
               variant="outline"
-              size="lg"
+              size="md"
               fullWidth
               leftIcon={<Home className="w-4 h-4" />}
             >
-              Return Home
+              Home
             </Button>
           </Link>
         </div>

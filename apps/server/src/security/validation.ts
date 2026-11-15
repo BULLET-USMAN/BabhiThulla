@@ -70,3 +70,31 @@ export const RematchVoteSchema = z.object({
 export const LeaveRoomSchema = z.object({
   roomCode: RoomCodeSchema,
 });
+
+export const SendEmoteSchema = z.object({
+  roomCode: RoomCodeSchema,
+  emoteId: z.enum([
+    'laugh',
+    'cool',
+    'shocked',
+    'crying',
+    'clap',
+    'skull',
+    'fire',
+    'heart',
+  ]),
+});
+
+export const SendQuickChatSchema = z.object({
+  roomCode: RoomCodeSchema,
+  messageId: z.enum([
+    'nice_move',
+    'thulla',
+    'youre_next',
+    'good_game',
+    'lets_go',
+    'oops',
+    'play_faster',
+    'rematch',
+  ]),
+});

@@ -3,6 +3,7 @@ import {
   GuestSettings,
   DEFAULT_GUEST_SETTINGS,
 } from '@bhabhi/shared';
+import { audioManager } from '../audio/audioManager.js';
 import { soundService } from '../services/sound.js';
 
 interface SettingsContextValue {
@@ -35,10 +36,24 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       console.warn('Failed to save settings to localStorage', e);
     }
 
+    // Sync legacy sound service as well
     soundService.setEnabled(settings.soundEnabled);
 
+    // Sync audio manager
+    audioManager.updateSettings({
+      masterSound: settings.soundEnabled,
+      sfxEnabled: settings.sfxEnabled ?? true,
+      volume: settings.volume ?? 70,
+    });
+
     // Apply reduced motion class to root
-    if (settings.reducedMotion) {
+    const prefersReduced =
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const isReduced = settings.reducedMotion || settings.animationSpeed === 'reduced' || prefersReduced;
+
+    if (isReduced) {
       document.documentElement.classList.add('reduced-motion');
     } else {
       document.documentElement.classList.remove('reduced-motion');

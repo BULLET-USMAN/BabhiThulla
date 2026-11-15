@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, Suit, Rank, SUIT_NAMES, SUIT_COLORS, RANK_NAMES } from '@bhabhi/shared';
 import { SuitIcon } from './SuitIcon.js';
 import { CardBack } from './CardBack.js';
+import { audioManager } from '../../audio/audioManager.js';
 import { soundService } from '../../services/sound.js';
 
 export interface PlayingCardProps {
@@ -13,7 +14,11 @@ export interface PlayingCardProps {
   isDisabled?: boolean;
   isHighlighted?: boolean;
   size?: 'sm' | 'md' | 'lg';
+  isDraggable?: boolean;
   onClick?: () => void;
+  onDoubleClick?: () => void;
+  onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragEnd?: (e: React.DragEvent<HTMLDivElement>) => void;
   className?: string;
   rotation?: number; // In degrees for trick pile rotations
 }
@@ -27,7 +32,11 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
   isDisabled = false,
   isHighlighted = false,
   size = 'md',
+  isDraggable = false,
   onClick,
+  onDoubleClick,
+  onDragStart,
+  onDragEnd,
   className = '',
   rotation = 0,
 }) => {
@@ -37,6 +46,7 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
 
   const handleClick = () => {
     if (isDisabled) return;
+    audioManager.playCardSelect();
     soundService.playCardSelect();
     if (onClick) {
       onClick();
@@ -48,6 +58,9 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       handleClick();
+    } else if (e.key === 'ArrowUp' && onDoubleClick) {
+      e.preventDefault();
+      onDoubleClick();
     }
   };
 
@@ -91,8 +104,12 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
       aria-label={cardLabel}
       aria-pressed={isSelected}
       aria-disabled={isDisabled}
+      draggable={!isDisabled && isDraggable}
       onClick={handleClick}
+      onDoubleClick={onDoubleClick}
       onKeyDown={handleKeyDown}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
       style={{
         transform: `rotate(${rotation}deg) translateY(${isSelected ? '-16px' : '0px'})`,
       }}
@@ -100,11 +117,11 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
         sizeClasses[size]
       } ${
         isSelected
-          ? 'ring-4 ring-gold-400 shadow-gold-glow z-20'
+          ? 'ring-4 ring-gold-400 shadow-gold-glow z-20 -translate-y-4'
           : 'hover:-translate-y-2 hover:shadow-card-lift'
       } ${
         isHighlighted
-          ? 'ring-2 ring-gold-500 animate-pulse'
+          ? 'ring-2 ring-gold-500 shadow-[0_0_12px_rgba(212,175,55,0.6)]'
           : ''
       } ${
         isDisabled

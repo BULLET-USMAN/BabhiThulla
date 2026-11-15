@@ -5,6 +5,7 @@ import { RateLimiter } from '../security/rateLimiter.js';
 import { registerRoomHandlers } from './handlers/roomHandlers.js';
 import { registerGameHandlers } from './handlers/gameHandlers.js';
 import { registerConnectionHandlers } from './handlers/connectionHandlers.js';
+import { registerReactionHandlers } from './handlers/reactionHandlers.js';
 import { roomManager } from '../rooms/roomManager.js';
 import { logger } from '../utils/logger.js';
 
@@ -24,6 +25,11 @@ export function setupSocketServer(httpServer: HttpServer): SocketIOServer {
     1000
   );
 
+  const reactionRateLimiter = new RateLimiter(
+    process.env.NODE_ENV === 'test' ? 1000 : 5,
+    3000
+  );
+
   io.on('connection', (socket) => {
     logger.info(`Socket connected: ${socket.id}`);
 
@@ -31,6 +37,7 @@ export function setupSocketServer(httpServer: HttpServer): SocketIOServer {
     registerRoomHandlers(io, socket, rateLimiter);
     registerGameHandlers(io, socket, rateLimiter);
     registerConnectionHandlers(io, socket);
+    registerReactionHandlers(io, socket, reactionRateLimiter);
   });
 
   // Background room cleanup timer (every 60 seconds)

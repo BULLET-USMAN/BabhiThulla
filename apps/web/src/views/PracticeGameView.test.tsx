@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { SettingsProvider } from '../context/SettingsContext.js';
@@ -23,5 +23,25 @@ describe('PracticeGameView Component', () => {
     expect(screen.getByText(/practice vs bots \(4p\)/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /play card/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /toggle game event history/i })).toBeInTheDocument();
+  });
+
+  it('renders reaction emote bar and opens on click', () => {
+    renderPracticeGame();
+    const emoteTrigger = screen.getByRole('button', { name: /reactions and quick chat/i });
+    expect(emoteTrigger).toBeInTheDocument();
+
+    fireEvent.click(emoteTrigger);
+    expect(screen.getByText('Emotes')).toBeInTheDocument();
+    expect(screen.getByText('Quick Chat')).toBeInTheDocument();
+  });
+
+  it('opens in-game settings modal when settings button is clicked', () => {
+    renderPracticeGame();
+    const settingsBtn = screen.getByRole('button', { name: /game settings/i });
+    expect(settingsBtn).toBeInTheDocument();
+
+    fireEvent.click(settingsBtn);
+    expect(screen.getByText('Game Settings')).toBeInTheDocument();
+    expect(screen.getByText(/animation speed/i)).toBeInTheDocument();
   });
 });
