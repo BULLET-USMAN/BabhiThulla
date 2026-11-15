@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 
-export type ToastType = 'success' | 'error' | 'info';
+export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
 export interface ToastMessage {
   id: string;
@@ -12,6 +12,7 @@ export interface ToastMessage {
 
 interface ToastContextValue {
   showToast: (message: string, type?: ToastType, title?: string) => void;
+  addToast: (message: string, type?: ToastType, title?: string) => void;
   removeToast: (id: string) => void;
 }
 
@@ -38,7 +39,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <ToastContext.Provider value={{ showToast, removeToast }}>
+    <ToastContext.Provider value={{ showToast, addToast: showToast, removeToast }}>
       {children}
       {/* Toast Render Container */}
       <div
@@ -54,12 +55,15 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 ? 'bg-felt-900/90 border-felt-500/50 text-cream-100'
                 : toast.type === 'error'
                 ? 'bg-ruby-900/90 border-ruby-500/50 text-cream-100'
+                : toast.type === 'warning'
+                ? 'bg-amber-950/90 border-amber-500/50 text-cream-100'
                 : 'bg-charcoal-800/95 border-gold-500/40 text-cream-100'
             }`}
           >
             <div className="flex-shrink-0 mt-0.5">
               {toast.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-400" />}
               {toast.type === 'error' && <AlertCircle className="w-5 h-5 text-ruby-500" />}
+              {toast.type === 'warning' && <AlertCircle className="w-5 h-5 text-amber-400" />}
               {toast.type === 'info' && <Info className="w-5 h-5 text-gold-400" />}
             </div>
             <div className="flex-1 min-w-0">

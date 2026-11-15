@@ -16,9 +16,9 @@ describe('Server Application Health & Error Endpoints', () => {
   it('GET /api/version returns phase information', async () => {
     const res = await request(app).get('/api/version');
     expect(res.status).toBe(200);
-    expect(res.body.version).toBe('0.1.0');
-    expect(res.body.phase).toBe(1);
-    expect(res.body.multiplayerReady).toBe(false);
+    expect(res.body.version).toBe('0.3.0');
+    expect(res.body.phase).toBe(3);
+    expect(res.body.multiplayerReady).toBe(true);
   });
 
   it('GET /unknown-route returns 404 JSON', async () => {

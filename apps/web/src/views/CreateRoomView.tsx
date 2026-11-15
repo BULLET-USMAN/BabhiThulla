@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Lock, Users, Sparkles } from 'lucide-react';
 import {
-  generateMockRoomCode,
   MIN_PLAYERS,
   MAX_PLAYERS,
   DEFAULT_PLAYERS,
@@ -10,19 +9,22 @@ import {
 import { Button } from '../components/ui/Button.js';
 import { AvatarBadge } from '../components/ui/AvatarBadge.js';
 import { useSettings } from '../context/SettingsContext.js';
+import { useMultiplayer } from '../context/MultiplayerContext.js';
 import { ProfileModal } from '../components/profile/ProfileModal.js';
 
 export function CreateRoomView() {
   const navigate = useNavigate();
   const { settings } = useSettings();
+  const { createRoom, isConnecting } = useMultiplayer();
   const [maxPlayers, setMaxPlayers] = useState<number>(DEFAULT_PLAYERS);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
 
-  const handleCreateRoom = (e: React.FormEvent) => {
+  const handleCreateRoom = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In Phase 1 preview, generate mock room code and navigate to Lobby preview
-    const mockCode = generateMockRoomCode();
-    navigate(`/lobby/${mockCode}?host=true&players=${maxPlayers}`);
+    const result = await createRoom(settings.nickname, settings.avatar, maxPlayers);
+    if (result.success && result.roomCode) {
+      navigate(`/lobby/${result.roomCode}?host=true&players=${maxPlayers}`);
+    }
   };
 
   return (
@@ -56,11 +58,11 @@ export function CreateRoomView() {
           </span>
         </div>
 
-        {/* Preview Notice Banner */}
+        {/* Room Info Banner */}
         <div className="mb-6 p-3.5 rounded-xl bg-charcoal-900 border border-gold-500/30 flex items-start space-x-3 text-xs text-cream-200">
           <Sparkles className="w-4 h-4 text-gold-400 flex-shrink-0 mt-0.5" />
           <div>
-            <strong className="text-gold-300">Phase 1 Preview Mode:</strong> Creating a room launches a local offline lobby simulation with mock seats. Real multiplayer networking connects in Phase 2.
+            <strong className="text-gold-300">Live Multiplayer:</strong> Creates a real-time room with an authoritative server session. Friends join using the room code or link.
           </div>
         </div>
 
@@ -135,10 +137,11 @@ export function CreateRoomView() {
             type="submit"
             variant="gold"
             size="lg"
+            disabled={isConnecting}
             fullWidth
             rightIcon={<Sparkles className="w-4 h-4" />}
           >
-            Create Room (Preview)
+            {isConnecting ? 'Creating Room...' : 'Create Room'}
           </Button>
         </form>
       </div>

@@ -1,21 +1,33 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link, useSearchParams, useParams } from 'react-router-dom';
 import { ArrowLeft, KeyRound, Sparkles } from 'lucide-react';
 import { validateRoomCode } from '@bhabhi/shared';
 import { Button } from '../components/ui/Button.js';
 import { Input } from '../components/ui/Input.js';
 import { AvatarBadge } from '../components/ui/AvatarBadge.js';
 import { useSettings } from '../context/SettingsContext.js';
+import { useMultiplayer } from '../context/MultiplayerContext.js';
 import { ProfileModal } from '../components/profile/ProfileModal.js';
 
 export function JoinRoomView() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { roomCode: paramCode } = useParams<{ roomCode: string }>();
   const { settings } = useSettings();
-  const [roomCode, setRoomCode] = useState('');
+  const { joinRoom, isConnecting } = useMultiplayer();
+
+  const initialCode = (paramCode || searchParams.get('code') || '').toUpperCase().slice(0, 6);
+  const [roomCode, setRoomCode] = useState(initialCode);
   const [error, setError] = useState<string | undefined>();
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
-  const handleJoin = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (initialCode) {
+      setRoomCode(initialCode);
+    }
+  }, [initialCode]);
+
+  const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
     const result = validateRoomCode(roomCode);
     if (!result.valid) {
@@ -24,7 +36,12 @@ export function JoinRoomView() {
     }
 
     const cleanCode = roomCode.trim().toUpperCase();
-    navigate(`/lobby/${cleanCode}?host=false`);
+    const joinResult = await joinRoom(cleanCode, settings.nickname, settings.avatar);
+    if (joinResult.success) {
+      navigate(`/lobby/${cleanCode}?host=false`);
+    } else {
+      setError(joinResult.error || 'Failed to join room.');
+    }
   };
 
   return (
@@ -58,11 +75,11 @@ export function JoinRoomView() {
           </span>
         </div>
 
-        {/* Preview Notice Banner */}
+        {/* Info Banner */}
         <div className="mb-6 p-3.5 rounded-xl bg-charcoal-900 border border-gold-500/30 flex items-start space-x-3 text-xs text-cream-200">
           <Sparkles className="w-4 h-4 text-gold-400 flex-shrink-0 mt-0.5" />
           <div>
-            <strong className="text-gold-300">Phase 1 Preview Mode:</strong> Validates room code formatting and opens the offline lobby preview. Full server room synchronization goes live in Phase 2.
+            <strong className="text-gold-300">Live Multiplayer:</strong> Connects in real-time to your friend's private room.
           </div>
         </div>
 
@@ -108,14 +125,8 @@ export function JoinRoomView() {
 
           {/* Quick Demo Code Suggestion */}
           <div className="flex items-center justify-between text-xs text-gray-400 px-1">
-            <span>Don't have a code?</span>
-            <button
-              type="button"
-              onClick={() => setRoomCode('BH77AA')}
-              className="text-gold-400 hover:text-gold-300 underline font-mono font-medium"
-            >
-              Use demo code: BH77AA
-            </button>
+            <span>Have an invite link?</span>
+            <span className="text-gray-400">Paste the 6-character code above</span>
           </div>
 
           {/* Submit */}
@@ -123,10 +134,11 @@ export function JoinRoomView() {
             type="submit"
             variant="emerald"
             size="lg"
+            disabled={isConnecting}
             fullWidth
             rightIcon={<Sparkles className="w-4 h-4" />}
           >
-            Enter Room (Preview)
+            {isConnecting ? 'Entering Room...' : 'Enter Room'}
           </Button>
         </form>
       </div>

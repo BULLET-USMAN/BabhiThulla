@@ -44,4 +44,20 @@ test.describe('Bhabhi Thulla Web Smoke Tests', () => {
     // Player action turn indicator
     await expect(page.getByText(/your turn/i)).toBeVisible();
   });
+
+  test('navigates to create, join, and multiplayer routes', async ({ page }) => {
+    // Create room view
+    await page.goto('/create');
+    await expect(page.getByRole('heading', { name: /create game room/i })).toBeVisible();
+    await expect(page.getByText(/player count/i)).toBeVisible();
+
+    // Join room view
+    await page.goto('/join');
+    await expect(page.getByRole('heading', { name: /join game room/i })).toBeVisible();
+    await expect(page.getByPlaceholder(/e\.g\. 7x9k2a/i)).toBeVisible();
+
+    // Direct multiplayer route without session
+    await page.goto('/multiplayer');
+    await expect(page.getByText(/no active multiplayer match/i)).toBeVisible();
+  });
 });

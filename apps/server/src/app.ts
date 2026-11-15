@@ -7,7 +7,7 @@ export function createApp() {
 
   app.use(
     cors({
-      origin: [config.clientUrl, 'http://localhost:5173', 'http://127.0.0.1:5173'],
+      origin: config.corsOrigins,
       credentials: true,
     })
   );
@@ -19,7 +19,7 @@ export function createApp() {
     res.status(200).json({
       status: 'ok',
       service: 'bhabhi-thulla-server',
-      version: '0.1.0',
+      version: '0.3.0',
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
     });
@@ -27,10 +27,10 @@ export function createApp() {
 
   app.get('/api/version', (_req: Request, res: Response) => {
     res.status(200).json({
-      version: '0.1.0',
-      phase: 1,
-      phaseName: 'Foundation & UI Design System',
-      multiplayerReady: false,
+      version: '0.3.0',
+      phase: 3,
+      phaseName: 'Real-Time Online Multiplayer',
+      multiplayerReady: true,
     });
   });
 

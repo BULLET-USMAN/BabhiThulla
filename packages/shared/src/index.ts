@@ -17,3 +17,4 @@ export * from './game/invariants.js';
 export * from './game/gameEngine.js';
 export * from './game/selectors.js';
 export * from './game/botStrategy.js';
+export * from './protocol/events.js';

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Copy,
@@ -18,29 +18,54 @@ import { AvatarBadge } from '../components/ui/AvatarBadge.js';
 import { StatusBadge } from '../components/ui/StatusBadge.js';
 import { useSettings } from '../context/SettingsContext.js';
 import { useToast } from '../context/ToastContext.js';
+import { useMultiplayer } from '../context/MultiplayerContext.js';
 
 export function LobbyView() {
-  const { roomCode = 'BTH77A' } = useParams<{ roomCode: string }>();
+  const { roomCode: paramCode } = useParams<{ roomCode: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { settings } = useSettings();
-  const { showToast } = useToast();
+  const { addToast } = useToast();
+  const {
+    room,
+    credentials,
+    gameState,
+    toggleReady,
+    startGame,
+    leaveRoom,
+  } = useMultiplayer();
 
-  const isHost = searchParams.get('host') !== 'false';
-  const maxPlayers = parseInt(searchParams.get('players') || `${DEFAULT_PLAYERS}`, 10);
+  const isRealMultiplayer = !!room;
+  const activeRoomCode = room?.roomCode || paramCode || 'BTH77A';
+
+  const isHost = isRealMultiplayer
+    ? credentials?.playerId === room.hostPlayerId
+    : searchParams.get('host') !== 'false';
+
+  const maxPlayers = room?.maxPlayers || parseInt(searchParams.get('players') || `${DEFAULT_PLAYERS}`, 10);
 
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [isReady, setIsReady] = useState(true);
+  const [localReady, setLocalReady] = useState(true);
 
-  // Mock participants for preview mode
+  // Navigate to multiplayer table when match starts
+  useEffect(() => {
+    if (gameState && gameState.status === 'playing') {
+      navigate('/multiplayer');
+    }
+  }, [gameState, navigate]);
+
+  const localMember = room?.players.find((p) => p.id === credentials?.playerId);
+  const isReady = isRealMultiplayer ? (localMember?.isReady ?? false) : localReady;
+
+  // Mock participants for preview fallback mode
   const mockParticipants: RoomParticipant[] = [
     {
       id: 'local-player',
       nickname: settings.nickname,
       avatar: settings.avatar,
       isHost: isHost,
-      isReady: isReady,
+      isReady: localReady,
       isConnected: true,
       seatIndex: 0,
     },
@@ -107,24 +132,52 @@ export function LobbyView() {
       : []),
   ];
 
+  const participants = isRealMultiplayer ? room.players : mockParticipants;
+
   const handleCopyCode = () => {
-    navigator.clipboard.writeText(roomCode);
+    navigator.clipboard.writeText(activeRoomCode);
     setCopiedCode(true);
-    showToast('Room code copied to clipboard!', 'success');
+    addToast('Room code copied to clipboard!', 'success');
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
   const handleCopyLink = () => {
-    const inviteUrl = `${window.location.origin}/join?code=${roomCode}`;
+    const inviteUrl = `${window.location.origin}/join/${activeRoomCode}`;
     navigator.clipboard.writeText(inviteUrl);
     setCopiedLink(true);
-    showToast('Invitation link copied to clipboard!', 'success');
+    addToast('Invitation link copied to clipboard!', 'success');
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
-  const handleStartGame = () => {
-    navigate(`/table?players=${maxPlayers}`);
+  const handleToggleReady = async () => {
+    if (isRealMultiplayer) {
+      await toggleReady(!isReady);
+    } else {
+      setLocalReady(!localReady);
+    }
   };
+
+  const handleStartGame = async () => {
+    if (isRealMultiplayer) {
+      const res = await startGame();
+      if (res.success) {
+        navigate('/multiplayer');
+      }
+    } else {
+      navigate(`/table?players=${maxPlayers}`);
+    }
+  };
+
+  const handleLeave = async () => {
+    if (isRealMultiplayer) {
+      await leaveRoom();
+    }
+    navigate('/');
+  };
+
+  const connectedCount = participants.filter((p) => p.isConnected).length;
+  const allReady = participants.filter((p) => p.isConnected).every((p) => p.isReady);
+  const canStart = isHost && connectedCount >= 3 && allReady;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 sm:py-12">
@@ -135,15 +188,19 @@ export function LobbyView() {
             <Sparkles className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-gold-300">Multiplayer Lobby Preview</h3>
+            <h3 className="text-sm font-bold text-gold-300">
+              {isRealMultiplayer ? 'Real-Time Multiplayer Room' : 'Multiplayer Lobby Preview'}
+            </h3>
             <p className="text-xs text-gray-400">
-              Slots and bots are simulated locally for Phase 1 UI validation. Live WebSocket multiplayer arrives in Phase 2.
+              {isRealMultiplayer
+                ? 'Share the room code or invite link with friends to join and play.'
+                : 'Slots and bots are simulated locally for Phase 1 UI validation. Live WebSocket multiplayer arrives in Phase 2.'}
             </p>
           </div>
         </div>
 
         <button
-          onClick={() => navigate('/')}
+          onClick={handleLeave}
           className="inline-flex items-center space-x-1.5 text-xs text-ruby-400 hover:text-ruby-300 px-3 py-1.5 rounded-lg border border-ruby-500/30 hover:bg-ruby-500/10 transition-colors"
         >
           <LogOut className="w-3.5 h-3.5" />
@@ -161,7 +218,7 @@ export function LobbyView() {
             </p>
             <div className="flex items-center space-x-3">
               <span className="text-3xl sm:text-4xl font-mono font-black tracking-widest text-gold-300 bg-charcoal-900 px-4 py-1.5 rounded-xl border border-gold-500/40">
-                {roomCode}
+                {activeRoomCode}
               </span>
               <button
                 onClick={handleCopyCode}
@@ -190,7 +247,7 @@ export function LobbyView() {
             <div className="flex items-center space-x-1 px-3 py-2 bg-charcoal-900 rounded-xl border border-charcoal-700 text-xs text-gray-300">
               <Users className="w-4 h-4 text-gold-400" />
               <span>
-                {mockParticipants.length} / {maxPlayers} Players
+                {connectedCount} / {maxPlayers} Players
               </span>
             </div>
           </div>
@@ -204,53 +261,62 @@ export function LobbyView() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {mockParticipants.map((p, idx) => (
-              <div
-                key={p.id}
-                className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
-                  idx === 0
-                    ? 'bg-felt-900/40 border-gold-500/50 shadow-md ring-1 ring-gold-500/30'
-                    : 'bg-charcoal-900/90 border-charcoal-700'
-                }`}
-              >
-                <div className="flex items-center space-x-3">
-                  <AvatarBadge avatarId={p.avatar} size="md" />
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <span className="font-semibold text-sm text-cream-100">
-                        {p.nickname}
-                      </span>
-                      {idx === 0 && (
-                        <span className="text-[10px] uppercase font-bold text-gold-400 bg-gold-500/20 px-1.5 py-0.5 rounded">
-                          You
+            {participants.map((p, idx) => {
+              const isLocal = isRealMultiplayer
+                ? p.id === credentials?.playerId
+                : idx === 0;
+
+              return (
+                <div
+                  key={p.id}
+                  className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
+                    isLocal
+                      ? 'bg-felt-900/40 border-gold-500/50 shadow-md ring-1 ring-gold-500/30'
+                      : 'bg-charcoal-900/90 border-charcoal-700'
+                  }`}
+                >
+                  <div className="flex items-center space-x-3">
+                    <AvatarBadge avatarId={p.avatar} size="md" />
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-semibold text-sm text-cream-100">
+                          {p.nickname}
                         </span>
-                      )}
-                    </div>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <StatusBadge type="connected" label="Connected" />
-                      {p.isHost && <StatusBadge type="host" />}
+                        {isLocal && (
+                          <span className="text-[10px] uppercase font-bold text-gold-400 bg-gold-500/20 px-1.5 py-0.5 rounded">
+                            You
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center space-x-2 mt-1">
+                        <StatusBadge
+                          type={p.isConnected ? 'connected' : 'disconnected'}
+                          label={p.isConnected ? 'Connected' : 'Offline'}
+                        />
+                        {p.isHost && <StatusBadge type="host" />}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div>
-                  {idx === 0 ? (
-                    <button
-                      onClick={() => setIsReady(!isReady)}
-                      className={`text-xs px-3 py-1.5 rounded-lg font-semibold border transition-all ${
-                        isReady
-                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                          : 'bg-charcoal-800 text-gray-400 border-charcoal-600'
-                      }`}
-                    >
-                      {isReady ? 'Ready ✓' : 'Click to Ready'}
-                    </button>
-                  ) : (
-                    <StatusBadge type={p.isReady ? 'ready' : 'waiting'} />
-                  )}
+                  <div>
+                    {isLocal ? (
+                      <button
+                        onClick={handleToggleReady}
+                        className={`text-xs px-3 py-1.5 rounded-lg font-semibold border transition-all ${
+                          isReady
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                            : 'bg-charcoal-800 text-gray-400 border-charcoal-600'
+                        }`}
+                      >
+                        {isReady ? 'Ready ✓' : 'Click to Ready'}
+                      </button>
+                    ) : (
+                      <StatusBadge type={p.isReady ? 'ready' : 'waiting'} />
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -258,18 +324,25 @@ export function LobbyView() {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-charcoal-700/80">
           <p className="text-xs text-gray-400 text-center sm:text-left">
             {isHost
-              ? 'As the host, you can launch the game table preview whenever you are ready.'
-              : 'Waiting for the host to launch the match...'}
+              ? connectedCount < 3
+                ? 'Need at least 3 players to start the match.'
+                : !allReady
+                ? 'Waiting for all players to click Ready...'
+                : 'All players are ready! Click to start the match.'
+              : isReady
+              ? 'Waiting for the host to launch the match...'
+              : 'Click Ready when you are prepared to play.'}
           </p>
 
           <Button
             variant="gold"
             size="lg"
+            disabled={isRealMultiplayer && !canStart}
             onClick={handleStartGame}
             leftIcon={<Play className="w-5 h-5 fill-current" />}
             className="w-full sm:w-auto min-w-[200px]"
           >
-            Launch Table Preview
+            {isRealMultiplayer ? 'Start Match' : 'Launch Table Preview'}
           </Button>
         </div>
       </div>

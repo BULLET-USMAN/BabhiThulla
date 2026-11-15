@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { SettingsProvider } from '../context/SettingsContext.js';
 import { ToastProvider } from '../context/ToastContext.js';
+import { MultiplayerProvider } from '../context/MultiplayerContext.js';
 import { CreateRoomView } from './CreateRoomView.js';
 import { JoinRoomView } from './JoinRoomView.js';
 import { LobbyView } from './LobbyView.js';
@@ -12,9 +13,11 @@ describe('Create, Join & Lobby Views', () => {
     render(
       <SettingsProvider>
         <ToastProvider>
-          <MemoryRouter>
-            <CreateRoomView />
-          </MemoryRouter>
+          <MultiplayerProvider>
+            <MemoryRouter>
+              <CreateRoomView />
+            </MemoryRouter>
+          </MultiplayerProvider>
         </ToastProvider>
       </SettingsProvider>
     );
@@ -28,9 +31,11 @@ describe('Create, Join & Lobby Views', () => {
     render(
       <SettingsProvider>
         <ToastProvider>
-          <MemoryRouter>
-            <JoinRoomView />
-          </MemoryRouter>
+          <MultiplayerProvider>
+            <MemoryRouter>
+              <JoinRoomView />
+            </MemoryRouter>
+          </MultiplayerProvider>
         </ToastProvider>
       </SettingsProvider>
     );
@@ -49,11 +54,13 @@ describe('Create, Join & Lobby Views', () => {
     render(
       <SettingsProvider>
         <ToastProvider>
-          <MemoryRouter initialEntries={['/lobby/TEST99?host=true&players=4']}>
-            <Routes>
-              <Route path="/lobby/:roomCode" element={<LobbyView />} />
-            </Routes>
-          </MemoryRouter>
+          <MultiplayerProvider>
+            <MemoryRouter initialEntries={['/lobby/TEST99?host=true&players=4']}>
+              <Routes>
+                <Route path="/lobby/:roomCode" element={<LobbyView />} />
+              </Routes>
+            </MemoryRouter>
+          </MultiplayerProvider>
         </ToastProvider>
       </SettingsProvider>
     );
