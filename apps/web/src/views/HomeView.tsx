@@ -1,12 +1,15 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Play, Users, BookOpen, Settings, ShieldCheck, Sparkles } from 'lucide-react';
+import { Play, Users, BookOpen, Settings, ShieldCheck, Sparkles, Bot } from 'lucide-react';
 import { PlayingCard } from '../components/cards/PlayingCard.js';
 import { Button } from '../components/ui/Button.js';
 import { useSettings } from '../context/SettingsContext.js';
 import { AvatarBadge } from '../components/ui/AvatarBadge.js';
+import { PracticeSetupModal } from '../components/game/PracticeSetupModal.js';
 
 export function HomeView() {
   const { settings } = useSettings();
+  const [isPracticeModalOpen, setIsPracticeModalOpen] = useState(false);
 
   return (
     <div className="relative min-h-[calc(100vh-4rem)] flex flex-col justify-between overflow-hidden">
@@ -66,27 +69,40 @@ export function HomeView() {
         </div>
 
         {/* Primary Action Buttons */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full max-w-md mb-8">
-          <Link to="/create" className="w-full">
-            <Button
-              variant="gold"
-              size="lg"
-              fullWidth
-              leftIcon={<Play className="w-5 h-5 fill-current" />}
-            >
-              Create Room
-            </Button>
-          </Link>
-          <Link to="/join" className="w-full">
-            <Button
-              variant="emerald"
-              size="lg"
-              fullWidth
-              leftIcon={<Users className="w-5 h-5" />}
-            >
-              Join Room
-            </Button>
-          </Link>
+        <div className="flex flex-col items-center justify-center gap-3.5 w-full max-w-md mb-8">
+          <Button
+            variant="gold"
+            size="lg"
+            fullWidth
+            onClick={() => setIsPracticeModalOpen(true)}
+            leftIcon={<Bot className="w-5 h-5" />}
+            className="shadow-gold-glow text-base"
+          >
+            Play vs Bots (Practice)
+          </Button>
+
+          <div className="grid grid-cols-2 gap-3 w-full">
+            <Link to="/create" className="w-full">
+              <Button
+                variant="emerald"
+                size="md"
+                fullWidth
+                leftIcon={<Play className="w-4 h-4 fill-current" />}
+              >
+                Create Room
+              </Button>
+            </Link>
+            <Link to="/join" className="w-full">
+              <Button
+                variant="outline"
+                size="md"
+                fullWidth
+                leftIcon={<Users className="w-4 h-4" />}
+              >
+                Join Room
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Secondary Navigation */}
@@ -121,6 +137,11 @@ export function HomeView() {
           </p>
         </div>
       </footer>
+      {/* Practice Setup Modal */}
+      <PracticeSetupModal
+        isOpen={isPracticeModalOpen}
+        onClose={() => setIsPracticeModalOpen(false)}
+      />
     </div>
   );
 }

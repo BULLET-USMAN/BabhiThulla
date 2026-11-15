@@ -5,8 +5,24 @@ test.describe('Bhabhi Thulla Web Smoke Tests', () => {
     await page.goto('/');
     await expect(page).toHaveTitle(/Bhabhi Thulla/i);
     await expect(page.getByRole('heading', { name: /bhabhi thulla/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /play vs bots/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /create room/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /join room/i })).toBeVisible();
+  });
+
+  test('opens practice setup modal and launches practice match', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: /play vs bots/i }).click();
+
+    // Verify modal appears
+    await expect(page.getByText(/play vs bots \(practice mode\)/i)).toBeVisible();
+
+    // Start practice match
+    await page.getByRole('button', { name: /start practice match/i }).click();
+
+    // Verify practice game table renders
+    await expect(page.getByText(/practice vs bots/i)).toBeVisible();
+    await expect(page.getByRole('button', { name: /play card/i })).toBeVisible();
   });
 
   test('navigates to how to play and shows Thulla walkthrough', async ({ page }) => {

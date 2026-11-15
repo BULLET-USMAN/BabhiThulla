@@ -3,10 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { App } from './App.js';
 
 describe('App Navigation and Home View', () => {
-  it('renders landing page with title and primary actions', () => {
+  it('renders landing page with title and primary actions including Play vs Bots', () => {
     render(<App />);
     expect(screen.getByRole('heading', { name: /bhabhi thulla/i })).toBeInTheDocument();
     expect(screen.getByText(/the classic card game\. now online\./i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /play vs bots/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /create room/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /join room/i })).toBeInTheDocument();
   });

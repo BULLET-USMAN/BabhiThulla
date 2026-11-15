@@ -4,3 +4,16 @@ export * from './models/room.js';
 export * from './utils/deck.js';
 export * from './utils/validation.js';
 export * from './constants/index.js';
+
+// Game Engine Exports
+export * from './game/types.js';
+export * from './game/cards.js';
+export * from './game/shuffle.js';
+export * from './game/deal.js';
+export * from './game/legalMoves.js';
+export * from './game/trickResolver.js';
+export * from './game/turnManager.js';
+export * from './game/invariants.js';
+export * from './game/gameEngine.js';
+export * from './game/selectors.js';
+export * from './game/botStrategy.js';
