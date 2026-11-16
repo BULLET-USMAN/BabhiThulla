@@ -11,6 +11,7 @@ import {
 } from '@bhabhi/shared';
 import { audioManager } from '../audio/audioManager.js';
 import { useToast } from '../context/ToastContext.js';
+import { hapticsService } from '../platform/index.js';
 
 export interface UsePracticeGameOptions {
   playerCount: number;
@@ -88,6 +89,7 @@ export function usePracticeGame({
         return false;
       }
 
+      hapticsService.cardPlay();
       handlePostActionResult(result.state, result.events);
       return true;
     },
@@ -117,6 +119,7 @@ export function usePracticeGame({
         for (const ev of events) {
           if (ev.type === 'THULLA_OCCURRED') {
             audioManager.playThulla();
+            hapticsService.thullaHit();
           } else if (ev.type === 'PILE_COLLECTED') {
             audioManager.playPileCollect();
             const collector = nextState.players.find((p) => p.id === ev.playerId);
@@ -138,9 +141,17 @@ export function usePracticeGame({
             audioManager.playTrickSweep();
           } else if (ev.type === 'PLAYER_ESCAPED') {
             audioManager.playEscapeFanfare();
+            if (ev.playerId === humanId) {
+              hapticsService.victory();
+            }
             showToast(`${ev.message}`, 'success');
           } else if (ev.type === 'BHABHI_DECLARED') {
             audioManager.playBhabhiDefeat();
+            if (ev.details?.bhabhiPlayerId === humanId) {
+              hapticsService.bhabhiDefeat();
+            } else {
+              hapticsService.victory();
+            }
           }
         }
       }
@@ -161,6 +172,7 @@ export function usePracticeGame({
     const currentPlayer = gameState.players.find((p) => p.id === currentTurnId);
     if (!currentPlayer || !currentPlayer.isBot) {
       setIsBotThinking(false);
+      hapticsService.turnAlert();
       return;
     }
 

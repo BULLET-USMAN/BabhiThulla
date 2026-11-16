@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { Card } from '@bhabhi/shared';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { PlayingCard } from './PlayingCard.js';
+import { hapticsService } from '../../platform/index.js';
 
 export interface CardHandProps {
   cards: Card[];
@@ -117,7 +118,12 @@ export const CardHand: React.FC<CardHandProps> = ({
                   isDisabled={isDisabled}
                   isHighlighted={isHighlighted}
                   isDraggable={isDraggable && !isDisabled}
-                  onClick={() => onSelectCard?.(card)}
+                  onClick={() => {
+                    if (!isDisabled) {
+                      hapticsService.cardSelect();
+                    }
+                    onSelectCard?.(card);
+                  }}
                   onDoubleClick={() => onPlayCard?.(card)}
                   onDragStart={(e) => {
                     if (isDisabled) return;

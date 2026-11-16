@@ -9,6 +9,7 @@ import {
   Sparkles,
   Link2,
   Trophy,
+  Share2,
 } from 'lucide-react';
 import {
   RoomParticipant,
@@ -21,6 +22,7 @@ import { useSettings } from '../context/SettingsContext.js';
 import { useToast } from '../context/ToastContext.js';
 import { useMultiplayer } from '../context/MultiplayerContext.js';
 import { RoomLeaderboardModal } from '../components/multiplayer/RoomLeaderboardModal.js';
+import { shareRoomInvite, lifecycleManager } from '../platform/index.js';
 
 export function LobbyView() {
   const { roomCode: paramCode } = useParams<{ roomCode: string }>();
@@ -153,6 +155,19 @@ export function LobbyView() {
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
+  const handleShareInvite = async () => {
+    const baseUrl = ((import.meta as any).env?.VITE_PUBLIC_APP_URL || window.location.origin).replace(/\/$/, '');
+    const inviteUrl = `${baseUrl}/join/${activeRoomCode}`;
+    const res = await shareRoomInvite({ roomCode: activeRoomCode, inviteUrl });
+    if (res.action === 'copied') {
+      setCopiedLink(true);
+      addToast('Invitation link copied to clipboard!', 'success');
+      setTimeout(() => setCopiedLink(false), 2000);
+    } else if (res.action === 'shared') {
+      addToast('Invitation sheet opened!', 'info');
+    }
+  };
+
   const handleToggleReady = async () => {
     if (isRealMultiplayer) {
       await toggleReady(!isReady);
@@ -178,6 +193,18 @@ export function LobbyView() {
     }
     navigate('/');
   };
+
+  // Back button confirmation inside lobby
+  useEffect(() => {
+    const unbind = lifecycleManager.registerBackHandler(10, () => {
+      const confirmed = window.confirm('Leave this room and return to home?');
+      if (confirmed) {
+        handleLeave();
+      }
+      return true; // Always consumed so user does not exit without confirmation
+    });
+    return unbind;
+  }, [handleLeave]);
 
   const connectedCount = participants.filter((p) => p.isConnected).length;
   const allReady = participants.filter((p) => p.isConnected).every((p) => p.isReady);
@@ -239,7 +266,15 @@ export function LobbyView() {
             </div>
           </div>
 
-          <div className="flex items-center space-x-3 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full md:w-auto">
+            <Button
+              variant="outline"
+              size="md"
+              onClick={handleShareInvite}
+              leftIcon={<Share2 className="w-4 h-4 text-gold-400" />}
+            >
+              Share Room
+            </Button>
             <Button
               variant="outline"
               size="md"

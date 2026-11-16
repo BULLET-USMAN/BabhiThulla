@@ -5,6 +5,7 @@ import {
 } from '@bhabhi/shared';
 import { audioManager } from '../audio/audioManager.js';
 import { soundService } from '../services/sound.js';
+import { platformStorage, hapticsService } from '../platform/index.js';
 
 interface SettingsContextValue {
   settings: GuestSettings;
@@ -19,22 +20,18 @@ const SettingsContext = createContext<SettingsContextValue | undefined>(undefine
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettings] = useState<GuestSettings>(() => {
     try {
-      const stored = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      const stored = platformStorage.getSync(SETTINGS_STORAGE_KEY);
       if (stored) {
         return { ...DEFAULT_GUEST_SETTINGS, ...JSON.parse(stored) };
       }
     } catch (e) {
-      console.warn('Failed to read settings from localStorage', e);
+      console.warn('Failed to read settings from storage', e);
     }
     return DEFAULT_GUEST_SETTINGS;
   });
 
   useEffect(() => {
-    try {
-      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
-    } catch (e) {
-      console.warn('Failed to save settings to localStorage', e);
-    }
+    platformStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings)).catch(() => {});
 
     // Sync legacy sound service as well
     soundService.setEnabled(settings.soundEnabled);
@@ -45,6 +42,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       sfxEnabled: settings.sfxEnabled ?? true,
       volume: settings.volume ?? 70,
     });
+
+    // Sync haptics service
+    hapticsService.setEnabled(settings.hapticsEnabled !== false);
 
     // Apply reduced motion class to root
     const prefersReduced =

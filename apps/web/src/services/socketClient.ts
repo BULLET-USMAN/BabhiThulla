@@ -14,6 +14,10 @@ function getServerUrl(): string {
     if (port === '5173' || port === '4173') {
       return `${protocol}//${hostname}:3001`;
     }
+    // Native Capacitor Android webview default fallback (10.0.2.2 for emulator)
+    if (hostname === 'localhost' && (!port || port === '80' || port === '443')) {
+      return 'http://10.0.2.2:3001';
+    }
     return window.location.origin;
   }
   return 'http://localhost:3001';

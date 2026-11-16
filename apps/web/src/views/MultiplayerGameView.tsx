@@ -30,6 +30,7 @@ import { GameSettingsModal } from '../components/game/GameSettingsModal.js';
 import { DealingOverlay } from '../components/game/DealingOverlay.js';
 import { AnimatedTrickPile } from '../components/game/AnimatedTrickPile.js';
 import { ResultModal } from '../components/game/ResultModal.js';
+import { lifecycleManager } from '../platform/index.js';
 
 export function MultiplayerGameView() {
   const navigate = useNavigate();
@@ -72,6 +73,25 @@ export function MultiplayerGameView() {
       setHasVotedRematch(false);
     }
   }, [gameState?.status]);
+
+  // Back button confirmation during match
+  useEffect(() => {
+    const unbind = lifecycleManager.registerBackHandler(20, () => {
+      if (isSettingsOpen) {
+        setIsSettingsOpen(false);
+        return true;
+      }
+      const confirmed = window.confirm(
+        'Leave this match? If you leave now, you will be disconnected from the room.'
+      );
+      if (confirmed) {
+        leaveRoom();
+        navigate('/');
+      }
+      return true;
+    });
+    return unbind;
+  }, [isSettingsOpen, leaveRoom, navigate]);
 
   if (!gameState || !room) {
     return (

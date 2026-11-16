@@ -16,7 +16,10 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "android:sync": "npm run build --workspace=@bhabhi/web && npm run cap:sync --workspace=@bhabhi/web",
+    "android:open": "npm run cap:open --workspace=@bhabhi/web",
+    "android:build": "npm run cap:build --workspace=@bhabhi/web"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",

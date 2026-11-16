@@ -61,9 +61,17 @@ const defaultDevOrigins = [
   'http://localhost:3000',
 ];
 
+// Capacitor Android/iOS WebView origins
+const capacitorOrigins = [
+  'https://localhost',
+  'capacitor://localhost',
+  'http://localhost',
+];
+
 const corsOrigins = Array.from(
   new Set([
     ...(configuredOrigins.length > 0 ? configuredOrigins : ['http://localhost:5173']),
+    ...capacitorOrigins,
     ...(env.NODE_ENV !== 'production' ? defaultDevOrigins : []),
   ])
 );

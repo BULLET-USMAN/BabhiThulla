@@ -187,6 +187,24 @@ Fully persistent, crash-recoverable game state and player history backed by Post
 
 ---
 
+## 📱 Phase 7: Android Application, Cross-Platform Multiplayer & Native Mobile Experience
+
+### 🤖 Capacitor Android Architecture
+- **Single Monorepo Source of Truth**: The Android application is generated via **Capacitor 8.6.2** in `apps/web/android/`, sharing the identical React UI, TypeScript game engine, and networking layer with the web client.
+- **Cross-Platform Multiplayer**: Android and web browser players play together in the same private rooms using the authoritative Node.js + Socket.IO backend and Supabase PostgreSQL.
+- **Client Security Guarantee**: The Android app contains zero database credentials, service-role keys, or `DATABASE_URL` strings; all operations route via authenticated HTTPS and WSS connections.
+- **Native Mobile Features**:
+  - **Haptic Vibration Feedback**: Subtle tactile pulses on card selection, card play, turn changes, Thulla events, and victory/defeat ([haptics.ts](file:///e:/Downloads/Projects/BhabhiThulla/apps/web/src/platform/haptics.ts)).
+  - **Android Hardware Back-Button Handling**: Multi-level priority back handler intercepting in-game quits with confirmation dialogs and closing modals before returning home ([lifecycle.ts](file:///e:/Downloads/Projects/BhabhiThulla/apps/web/src/platform/lifecycle.ts)).
+  - **App Lifecycle Recovery**: Restores Socket.IO connections and resynchronizes game state on app resume from sleep or background.
+  - **Native Room Sharing**: System share sheet for room invitations with seamless clipboard fallback ([sharing.ts](file:///e:/Downloads/Projects/BhabhiThulla/apps/web/src/platform/sharing.ts)).
+  - **Offline Play vs Bots**: Practice mode is 100% self-contained locally with zero server or internet dependencies.
+- **Complete Android Guides**:
+  - [ANDROID_SETUP.md](file:///e:/Downloads/Projects/BhabhiThulla/ANDROID_SETUP.md): Beginner-friendly Windows setup for JDK 17/21, Android Studio, and SDK configuration.
+  - [ANDROID_BUILD.md](file:///e:/Downloads/Projects/BhabhiThulla/ANDROID_BUILD.md): Step-by-step instructions for building Debug APKs, signed Release APKs, and Google Play Android App Bundles (AAB).
+
+---
+
 ## 🛠️ Development & Scripts
 
 | Command | Description |
@@ -196,10 +214,12 @@ Fully persistent, crash-recoverable game state and player history backed by Post
 | `npm run build` | Compiles `@bhabhi/shared`, `@bhabhi/server`, and `@bhabhi/web` |
 | `npm run typecheck` | Validates strict TypeScript types across all workspaces |
 | `npm run lint` | Runs ESLint across all packages and apps (0 warnings, 0 errors) |
-| `npm test` | Runs all 143 unit, integration, and concurrency benchmark tests |
+| `npm test` | Runs all 153 unit, integration, and platform tests |
 | `npm run test:e2e` | Runs Playwright browser tests across Desktop and Mobile viewports |
+| `npm run android:sync` | Compiles web assets and synchronizes the native Android project |
+| `npm run android:open` | Opens the native Android project in Android Studio |
 | `npm run db:generate` | Generates Drizzle database migrations |
-| `npm run db:migrate` | Runs Drizzle migrations against the configured PostgreSQL database |
+| `npm run db:migrate` | Runs Drizzle migrations against the configured Supabase PostgreSQL database |
 
 ---
 
@@ -211,6 +231,7 @@ Fully persistent, crash-recoverable game state and player history backed by Post
 - [x] **Phase 4: Premium Gameplay Experience, Animations, Audio & Emotes**
 - [x] **Phase 5: Multiplayer Reliability, Persistent Storage, Player Statistics & Recovery**
 - [x] **Phase 6: Production Readiness, Security Hardening, Cloud Deployment & CI/CD**
+- [x] **Phase 7: Android Application, Cross-Platform Multiplayer, Native Mobile Experience & APK Release**
 
 ---
 

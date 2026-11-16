@@ -35,6 +35,7 @@ import { DealingOverlay } from '../components/game/DealingOverlay.js';
 import { AnimatedTrickPile } from '../components/game/AnimatedTrickPile.js';
 import { audioManager } from '../audio/audioManager.js';
 import { useSettings } from '../context/SettingsContext.js';
+import { lifecycleManager } from '../platform/index.js';
 
 export function PracticeGameView() {
   const [searchParams] = useSearchParams();
@@ -60,6 +61,22 @@ export function PracticeGameView() {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isDealing, setIsDealing] = useState<boolean>(true);
+
+  // Back button confirmation during offline game
+  useEffect(() => {
+    const unbind = lifecycleManager.registerBackHandler(20, () => {
+      if (isSettingsOpen) {
+        setIsSettingsOpen(false);
+        return true;
+      }
+      const confirmed = window.confirm('Exit offline practice game and return home?');
+      if (confirmed) {
+        navigate('/');
+      }
+      return true;
+    });
+    return unbind;
+  }, [isSettingsOpen, navigate]);
 
   // Active floating emotes and quick chats
   const [activeEmotes, setActiveEmotes] = useState<ActiveEmote[]>([]);

@@ -35,15 +35,14 @@ Logs are structured with JSON or formatted timestamps, containing `roomCode`, `m
 
 ---
 
-## 💾 Database Backup Strategy
+## 💾 Database Backup Strategy (Supabase PostgreSQL)
 
-### Backup Frequency & Retention
-- **Automated Hourly Snapshots**: Configured in cloud provider (Neon / Render / Supabase).
-- **Daily Full Logical Backups**: Retained for 30 days in off-site encrypted storage (e.g. AWS S3 or Cloudflare R2).
-- **Weekly Archive Backups**: Retained for 90 days.
+### Automated Cloud Backups
+- **Supabase Daily Backups**: Enabled automatically under **Project Settings > Database > Backups**.
+- **Point-In-Time Recovery (PITR)**: For production Pro tier, PITR provides continuous Write-Ahead Log (WAL) archiving with recovery to any second within the retention window.
 
 ### Manual Backup Procedure (`pg_dump`)
-Run the following script to create a compressed, custom-format database backup:
+Run the following command using your Supabase database connection URI:
 ```bash
 # Export schema and data with custom compression format
 pg_dump -Fc --no-owner --no-privileges \

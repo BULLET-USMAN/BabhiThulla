@@ -1,38 +1,56 @@
 # Bhabhi Thulla — Cloud Deployment Guide
 
-This guide provides instructions for deploying the **Bhabhi Thulla** online multiplayer card game to production using **Vercel** (Frontend), **Render** (Backend Node.js/Socket.IO Service), and **Managed PostgreSQL** (Neon, Render, Supabase, or AWS RDS).
+This guide provides instructions for deploying the **Bhabhi Thulla** online multiplayer card game to production using **Vercel** (Frontend), **Render** (Backend Node.js/Socket.IO Service), and **Supabase Managed PostgreSQL** (Database).
 
 ---
 
 ## 🏗️ Production Architecture
 
 ```
-[ Web Browser Clients ]
-      |
-      +---> HTTPS (CDN) ---> Vercel (React 18 / Vite SPA)
-      |
-      +---> WSS / HTTPS ---> Render (Node.js / Express / Socket.IO)
-                                  |
-                                  +---> Encrypted Snapshots & Stats
-                                  |
-                                  v
-                             Managed PostgreSQL (Neon / Render / Supabase)
+[ Android App Clients ]     [ Web Browser Clients ]
+         |                            |
+         |                            +---> HTTPS (CDN) ---> Vercel (Vite React SPA)
+         |                                                        |
+         +--------------------+-----------------------------------+
+                              |
+                              +---> HTTPS / WSS ---> Render (Node.js / Express / Socket.IO)
+                                                          |
+                                                          +---> PostgreSQL Wire Protocol + SSL
+                                                          |
+                                                          v
+                                                   Supabase Managed PostgreSQL
 ```
+
+> [!IMPORTANT]
+> **Client Privacy & Security Invariant:**
+> Neither the Android application nor the web client connects directly to the Supabase PostgreSQL database. `DATABASE_URL`, database passwords, and Supabase service-role keys are strictly server-side environment variables and are NEVER bundled in client builds or APKs. All client operations communicate exclusively with the server-authoritative backend via secure Socket.IO and HTTPS APIs.
 
 ---
 
-## 🗄️ Step 1: Managed PostgreSQL Database Setup
+## 🗄️ Step 1: Supabase Managed PostgreSQL Database Setup
 
-1. Provision a PostgreSQL 15+ database instance (recommended: Neon serverless or Render Managed PostgreSQL).
-2. Note your database connection string:
-   ```
-   postgresql://<user>:<password>@<host>:<port>/<dbname>?sslmode=require
-   ```
-3. Run migrations from your terminal to establish schema tables and indexes:
+The designated database provider is **Supabase PostgreSQL**.
+
+1. Create a free account or log in to [Supabase](https://supabase.com).
+2. Click **New Project** and configure:
+   - **Name**: `bhabhi-thulla-db`
+   - **Database Password**: Generate and securely store a strong database password.
+   - **Region**: Choose the region closest to your backend hosting (e.g. `us-east-1` or `eu-central-1`).
+3. Once the database is provisioned, navigate to **Project Settings > Database > Connection String**:
+   - Select the **URI** tab.
+   - For long-running Node.js services with connection pooling, select **Connection Pooling (Session mode)** on port `5432` or `6543`:
+     ```text
+     postgresql://postgres.[YOUR-PROJECT-REF]:[YOUR-PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?sslmode=require
+     ```
+   - Alternatively, you can use the **Direct Connection** string (port `5432`):
+     ```text
+     postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT-REF].supabase.co:5432/postgres?sslmode=require
+     ```
+4. Run migrations from your terminal to establish schema tables and indexes against your Supabase database:
    ```bash
-   DATABASE_URL="postgresql://<user>:<password>@<host>:<port>/<dbname>?sslmode=require" npm run db:migrate --workspace=@bhabhi/server
+   DATABASE_URL="postgresql://postgres.[YOUR-PROJECT-REF]:[YOUR-PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?sslmode=require" npm run db:migrate --workspace=@bhabhi/server
    ```
-   *Note: On clean deployment, schema tables (`guest_identities`, `game_matches`, `match_snapshots`, etc.) and performance indexes are automatically created.*
+   *Schema tables (`guest_identities`, `game_matches`, `match_snapshots`, `player_match_participations`, `player_statistics`) and compound indexes are automatically applied.*
 
 ---
 

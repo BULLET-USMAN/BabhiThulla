@@ -26,6 +26,8 @@ export interface GuestSettings {
   muteQuickChat?: boolean;
   dragAndDropEnabled?: boolean;
   cardSize: 'compact' | 'normal' | 'large';
+  hapticsEnabled?: boolean;
+  preferredOrientation?: 'auto' | 'portrait' | 'landscape';
 }
 
 export const DEFAULT_GUEST_SETTINGS: GuestSettings = {
@@ -40,6 +42,8 @@ export const DEFAULT_GUEST_SETTINGS: GuestSettings = {
   muteQuickChat: false,
   dragAndDropEnabled: true,
   cardSize: 'normal',
+  hapticsEnabled: true,
+  preferredOrientation: 'auto',
 };
 
 export const AVAILABLE_AVATARS: Array<{

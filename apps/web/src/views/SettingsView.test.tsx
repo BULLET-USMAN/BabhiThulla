@@ -22,16 +22,16 @@ describe('SettingsView Component', () => {
     renderSettings();
     expect(screen.getByText(/game settings/i)).toBeInTheDocument();
     expect(screen.getByText(/guest identity/i)).toBeInTheDocument();
-    expect(screen.getByText(/sound effects/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/sound effects/i)[0]).toBeInTheDocument();
   });
 
   it('allows toggling sound effects and persists state', () => {
     renderSettings();
-    const soundButton = screen.getByRole('button', { name: /enabled/i });
+    const soundButton = screen.getByRole('button', { name: /toggle sound effects/i });
     expect(soundButton).toBeInTheDocument();
 
     fireEvent.click(soundButton);
-    expect(screen.getByRole('button', { name: /disabled/i })).toBeInTheDocument();
+    expect(soundButton).toHaveTextContent(/disabled/i);
 
     const stored = JSON.parse(localStorage.getItem('bhabhi_guest_settings') || '{}');
     expect(stored.soundEnabled).toBe(false);

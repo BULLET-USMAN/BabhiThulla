@@ -46,6 +46,6 @@ export default [
     },
   },
   {
-    ignores: ['**/dist/**', '**/node_modules/**', '**/coverage/**', 'playwright-report/**'],
+    ignores: ['**/dist/**', '**/node_modules/**', '**/coverage/**', 'playwright-report/**', '**/android/**', 'apps/web/android/**'],
   },
 ];

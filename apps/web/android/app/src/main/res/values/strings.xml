@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Bhabhi Thulla</string>
+    <string name="title_activity_main">Bhabhi Thulla</string>
+    <string name="package_name">com.bhabhithulla.app</string>
+    <string name="custom_url_scheme">com.bhabhithulla.app</string>
+</resources>

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { AvatarId } from '@bhabhi/shared';
 import { apiClient } from '../services/apiClient.js';
 import { useSettings } from './SettingsContext.js';
+import { platformStorage } from '../platform/index.js';
 
 const GUEST_STORAGE_KEY = 'bhabhi_guest_identity';
 
@@ -25,9 +26,8 @@ const GuestAuthContext = createContext<GuestAuthContextValue | undefined>(undefi
 export const GuestAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { settings, updateSettings } = useSettings();
   const [identity, setIdentity] = useState<StoredGuestIdentity | null>(() => {
-    if (typeof window === 'undefined') return null;
     try {
-      const stored = localStorage.getItem(GUEST_STORAGE_KEY);
+      const stored = platformStorage.getSync(GUEST_STORAGE_KEY);
       return stored ? JSON.parse(stored) : null;
     } catch {
       return null;
@@ -36,11 +36,10 @@ export const GuestAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const saveIdentity = useCallback((idData: StoredGuestIdentity | null) => {
     setIdentity(idData);
-    if (typeof window === 'undefined') return;
     if (idData) {
-      localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(idData));
+      platformStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(idData)).catch(() => {});
     } else {
-      localStorage.removeItem(GUEST_STORAGE_KEY);
+      platformStorage.removeItem(GUEST_STORAGE_KEY).catch(() => {});
     }
   }, []);
 

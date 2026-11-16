@@ -18,6 +18,7 @@ import { socketClient } from '../services/socketClient.js';
 import { audioManager } from '../audio/audioManager.js';
 import { soundService } from '../services/sound.js';
 import { useToast } from './ToastContext.js';
+import { platformStorage, hapticsService, lifecycleManager } from '../platform/index.js';
 
 const SESSION_STORAGE_KEY = 'bhabhi_multiplayer_session';
 
@@ -71,9 +72,8 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const [room, setRoom] = useState<RoomSummary | null>(null);
   const [credentials, setCredentials] = useState<ClientSessionCredentials | null>(() => {
-    if (typeof window === 'undefined') return null;
     try {
-      const stored = localStorage.getItem(SESSION_STORAGE_KEY) || sessionStorage.getItem(SESSION_STORAGE_KEY);
+      const stored = platformStorage.getSync(SESSION_STORAGE_KEY);
       return stored ? JSON.parse(stored) : null;
     } catch {
       return null;
@@ -94,21 +94,15 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [activeQuickChats, setActiveQuickChats] = useState<ActiveQuickChat[]>([]);
 
   const graceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const prevTurnPlayerRef = useRef<string | null>(null);
 
   // Save or remove session from storage
   const persistSession = (creds: ClientSessionCredentials | null) => {
     setCredentials(creds);
-    if (typeof window === 'undefined') return;
     if (creds) {
-      try {
-        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(creds));
-        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(creds));
-      } catch (e) {
-        console.warn('Failed to persist session', e);
-      }
+      platformStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(creds)).catch(() => {});
     } else {
-      localStorage.removeItem(SESSION_STORAGE_KEY);
-      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      platformStorage.removeItem(SESSION_STORAGE_KEY).catch(() => {});
     }
   };
 
@@ -175,6 +169,14 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
       if (data.view.lastTrickResult) {
         setLastTrickResult(data.view.lastTrickResult);
       }
+      if (
+        credentials &&
+        data.view.currentTurnPlayerId === credentials.playerId &&
+        prevTurnPlayerRef.current !== credentials.playerId
+      ) {
+        hapticsService.turnAlert();
+      }
+      prevTurnPlayerRef.current = data.view.currentTurnPlayerId;
     };
 
     const handleGameStarted = () => {
@@ -187,6 +189,7 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
     const handleThulla = (data: { playerId: string; card?: { id: string } }) => {
       audioManager.playThulla();
       soundService.playThulla();
+      hapticsService.thullaHit();
       const p = room?.players.find((pl) => pl.id === data.playerId);
       const name = p?.nickname || 'A player';
       addToast(`THULLA! ${name} gave a Thulla!`, 'error');
@@ -199,6 +202,7 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
       if (data.result.isThulla) {
         audioManager.playPileCollect();
         soundService.playCollectPile();
+        hapticsService.thullaHit();
       } else {
         audioManager.playTrickSweep();
         soundService.playCardPlay();
@@ -207,6 +211,9 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     const handlePlayerEscaped = (data: { playerId: string }) => {
       audioManager.playPlayerEscape();
+      if (credentials && data.playerId === credentials.playerId) {
+        hapticsService.victory();
+      }
       const p = room?.players.find((pl) => pl.id === data.playerId);
       const name = p?.nickname || 'A player';
       addToast(`🎉 ${name} shed all cards and escaped!`, 'success');
@@ -214,6 +221,11 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     const handleGameFinished = (data: { bhabhiPlayerId: string }) => {
       audioManager.playBhabhiFinish();
+      if (credentials && data.bhabhiPlayerId === credentials.playerId) {
+        hapticsService.bhabhiDefeat();
+      } else {
+        hapticsService.victory();
+      }
       const bhabhi = room?.players.find((pl) => pl.id === data.bhabhiPlayerId);
       const name = bhabhi?.nickname || 'A player';
       addToast(`Game Over! ${name} is the Bhabhi!`, 'warning');
@@ -350,9 +362,19 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
   }, [room, credentials, reconnect, addToast]);
 
+  // Handle application foreground/background lifecycle
+  useEffect(() => {
+    const unbind = lifecycleManager.onResume(() => {
+      if (credentials && !socketClient.isConnected()) {
+        reconnect();
+      }
+    });
+    return unbind;
+  }, [credentials, reconnect]);
+
   const getStoredGuestId = (): string | undefined => {
     try {
-      const stored = localStorage.getItem('bhabhi_guest_identity');
+      const stored = platformStorage.getSync('bhabhi_guest_identity');
       if (stored) {
         const parsed = JSON.parse(stored);
         return parsed.guestId;
@@ -456,6 +478,7 @@ export const MultiplayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
     if (!room || !credentials) return { success: false, error: 'No active room.' };
     audioManager.playCardPlay();
     soundService.playCardPlay();
+    hapticsService.cardPlay();
 
     const requestId = `play-${Date.now()}-${cardId}`;
     const res = await socketClient.emitWithAck('game:play-card', {

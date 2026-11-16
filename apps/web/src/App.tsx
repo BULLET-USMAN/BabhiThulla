@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { SettingsProvider } from './context/SettingsContext.js';
 import { ToastProvider } from './context/ToastContext.js';
@@ -5,6 +6,7 @@ import { GuestAuthProvider } from './context/GuestAuthContext.js';
 import { MultiplayerProvider } from './context/MultiplayerContext.js';
 import { Navbar } from './components/layout/Navbar.js';
 import { ErrorBoundary } from './components/common/ErrorBoundary.js';
+import { initPlatformServices, lifecycleManager, platformStorage } from './platform/index.js';
 import { HomeView } from './views/HomeView.js';
 import { CreateRoomView } from './views/CreateRoomView.js';
 import { JoinRoomView } from './views/JoinRoomView.js';
@@ -25,7 +27,7 @@ function AppLayout() {
     location.pathname === '/multiplayer';
 
   return (
-    <div className="min-h-screen flex flex-col bg-charcoal-900 text-cream-100">
+    <div className="min-h-screen flex flex-col bg-charcoal-900 text-cream-100 safe-top safe-bottom safe-left safe-right">
       {!isTable && <Navbar />}
       <main className="flex-1 flex flex-col">
         <ErrorBoundary>
@@ -53,6 +55,12 @@ function AppLayout() {
 }
 
 export function App() {
+  useEffect(() => {
+    platformStorage.init();
+    initPlatformServices();
+    lifecycleManager.init();
+  }, []);
+
   return (
     <SettingsProvider>
       <GuestAuthProvider>
