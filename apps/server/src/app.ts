@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import { z } from 'zod';
 import { config } from './config/index.js';
 import { guestRepository } from './db/guestRepository.js';
@@ -8,6 +9,7 @@ import { matchHistoryRepository } from './db/matchHistoryRepository.js';
 import { isDbHealthy } from './db/connection.js';
 import { roomManager } from './rooms/roomManager.js';
 import { NicknameSchema, AvatarSchema } from './security/validation.js';
+import { RateLimiter } from './security/rateLimiter.js';
 
 const RegisterGuestSchema = z.object({
   displayName: NicknameSchema,
@@ -15,8 +17,37 @@ const RegisterGuestSchema = z.object({
   existingGuestId: z.string().optional(),
 });
 
+// Rate limiter for guest registration: 20 per minute per IP
+const registrationRateLimiter = new RateLimiter(20, 60000);
+
 export function createApp() {
   const app = express();
+
+  // Trust proxy headers for Render/Vercel/Cloudflare reverse proxies
+  app.set('trust proxy', 1);
+
+  // Security Headers via Helmet
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          connectSrc: ["'self'", ...config.corsOrigins, 'wss:', 'ws:'],
+          scriptSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:', 'blob:'],
+          fontSrc: ["'self'", 'https:', 'data:'],
+          objectSrc: ["'none'"],
+          upgradeInsecureRequests: config.isProd ? [] : null,
+        },
+      },
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      frameguard: { action: 'deny' },
+      noSniff: true,
+      xssFilter: true,
+      hidePoweredBy: true,
+    })
+  );
 
   app.use(
     cors({
@@ -25,20 +56,21 @@ export function createApp() {
     })
   );
 
-  app.use(express.json());
+  // Enforce reasonable payload size limit (64kb) to protect against DoS
+  app.use(express.json({ limit: '64kb' }));
 
-  // 1. Health and readiness endpoints
-  app.get('/api/health', (_req: Request, res: Response) => {
+  // 1. Health and readiness endpoints (supported at both root and /api prefixes)
+  const handleHealth = (_req: Request, res: Response) => {
     res.status(200).json({
       status: 'ok',
       service: 'bhabhi-thulla-server',
-      version: '0.5.0',
+      version: '0.6.0',
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
     });
-  });
+  };
 
-  app.get('/api/ready', async (_req: Request, res: Response) => {
+  const handleReady = async (_req: Request, res: Response) => {
     const dbStatus = await isDbHealthy();
     const rooms = roomManager.getAllRooms();
     const activeMatchesCount = rooms.filter((r) => r.status === 'playing').length;
@@ -55,13 +87,19 @@ export function createApp() {
       connectedPlayers: totalPlayersCount,
       timestamp: new Date().toISOString(),
     });
-  });
+  };
+
+  app.get('/health', handleHealth);
+  app.get('/api/health', handleHealth);
+
+  app.get('/ready', handleReady);
+  app.get('/api/ready', handleReady);
 
   app.get('/api/version', (_req: Request, res: Response) => {
     res.status(200).json({
-      version: '0.5.0',
-      phase: 5,
-      phaseName: 'Multiplayer Reliability, Persistence, Statistics & Anti-Cheat',
+      version: '0.6.0',
+      phase: 6,
+      phaseName: 'Production Readiness, Security Hardening & Cloud Deployment',
       multiplayerReady: true,
       persistentStorage: true,
       authoritativeStats: true,
@@ -70,6 +108,15 @@ export function createApp() {
 
   // 2. Guest Identity & Session Authentication
   app.post('/api/guest/register', async (req: Request, res: Response) => {
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || 'anonymous';
+    if (!registrationRateLimiter.isAllowed(clientIp)) {
+      res.status(429).json({
+        error: 'Too Many Requests',
+        message: 'Registration rate limit exceeded. Please wait a moment.',
+      });
+      return;
+    }
+
     const parsed = RegisterGuestSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({

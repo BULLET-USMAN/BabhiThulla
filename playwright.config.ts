@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+
 export default defineConfig({
   testDir: './e2e',
   timeout: 30000,
@@ -24,13 +26,13 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'npm.cmd run dev --workspace=@bhabhi/server',
-      url: 'http://localhost:3001/api/health',
+      command: `${npmCmd} run dev --workspace=@bhabhi/server`,
+      url: 'http://localhost:3001/health',
       reuseExistingServer: !process.env.CI,
       timeout: 120000,
     },
     {
-      command: 'npm.cmd run dev --workspace=@bhabhi/web',
+      command: `${npmCmd} run dev --workspace=@bhabhi/web`,
       url: 'http://localhost:5173',
       reuseExistingServer: !process.env.CI,
       timeout: 120000,

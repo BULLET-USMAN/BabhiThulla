@@ -4,6 +4,7 @@ import { ToastProvider } from './context/ToastContext.js';
 import { GuestAuthProvider } from './context/GuestAuthContext.js';
 import { MultiplayerProvider } from './context/MultiplayerContext.js';
 import { Navbar } from './components/layout/Navbar.js';
+import { ErrorBoundary } from './components/common/ErrorBoundary.js';
 import { HomeView } from './views/HomeView.js';
 import { CreateRoomView } from './views/CreateRoomView.js';
 import { JoinRoomView } from './views/JoinRoomView.js';
@@ -27,21 +28,25 @@ function AppLayout() {
     <div className="min-h-screen flex flex-col bg-charcoal-900 text-cream-100">
       {!isTable && <Navbar />}
       <main className="flex-1 flex flex-col">
-        <Routes>
-          <Route path="/" element={<HomeView />} />
-          <Route path="/create" element={<CreateRoomView />} />
-          <Route path="/join" element={<JoinRoomView />} />
-          <Route path="/join/:roomCode" element={<JoinRoomView />} />
-          <Route path="/lobby" element={<LobbyView />} />
-          <Route path="/lobby/:roomCode" element={<LobbyView />} />
-          <Route path="/table" element={<GameTablePreviewView />} />
-          <Route path="/practice" element={<PracticeGameView />} />
-          <Route path="/multiplayer" element={<MultiplayerGameView />} />
-          <Route path="/stats" element={<StatisticsView />} />
-          <Route path="/rules" element={<HowToPlayView />} />
-          <Route path="/settings" element={<SettingsView />} />
-          <Route path="*" element={<NotFoundView />} />
-        </Routes>
+        <ErrorBoundary>
+          <Routes>
+            <Route path="/" element={<HomeView />} />
+            <Route path="/create" element={<CreateRoomView />} />
+            <Route path="/join" element={<JoinRoomView />} />
+            <Route path="/join/:roomCode" element={<JoinRoomView />} />
+            <Route path="/lobby" element={<LobbyView />} />
+            <Route path="/lobby/:roomCode" element={<LobbyView />} />
+            <Route path="/table" element={<GameTablePreviewView />} />
+            <Route path="/practice" element={<PracticeGameView />} />
+            <Route path="/multiplayer" element={<MultiplayerGameView />} />
+            <Route path="/stats" element={<StatisticsView />} />
+            <Route path="/statistics" element={<StatisticsView />} />
+            <Route path="/history" element={<StatisticsView />} />
+            <Route path="/rules" element={<HowToPlayView />} />
+            <Route path="/settings" element={<SettingsView />} />
+            <Route path="*" element={<NotFoundView />} />
+          </Routes>
+        </ErrorBoundary>
       </main>
     </div>
   );

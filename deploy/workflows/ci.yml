@@ -1,0 +1,63 @@
+name: CI / Production Quality Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Lint, Typecheck, Unit Tests & Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      NODE_ENV: test
+      SESSION_SECRET: test-session-secret-for-ci-pipeline-123456
+      GAME_STATE_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js (LTS 20.x)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Monorepo Dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run TypeScript Strict Typecheck
+        run: npm run typecheck
+
+      - name: Run Unit & Integration Tests (Vitest)
+        run: npm test
+
+      - name: Install Playwright Browsers (Chromium)
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright End-to-End Tests
+        run: npm run test:e2e
+        env:
+          CI: true
+
+      - name: Build Monorepo Workspaces for Production
+        run: npm run build
+
+      - name: Upload Test Results on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

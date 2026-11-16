@@ -19,13 +19,13 @@ async function bootstrap() {
   // Attach Socket.IO server to HTTP server
   const io = setupSocketServer(server);
 
-  server.listen(config.port, () => {
+  server.listen(config.port, config.host, () => {
     console.log(`========================================`);
-    console.log(`  Bhabhi Thulla Multiplayer Server (Phase 5)`);
+    console.log(`  Bhabhi Thulla Multiplayer Server (Phase 6)`);
     console.log(`  Environment: ${config.nodeEnv}`);
-    console.log(`  Listening on: http://localhost:${config.port}`);
-    console.log(`  Health check: http://localhost:${config.port}/api/health`);
-    console.log(`  Readiness:    http://localhost:${config.port}/api/ready`);
+    console.log(`  Listening on: http://${config.host}:${config.port}`);
+    console.log(`  Health check: http://${config.host}:${config.port}/health`);
+    console.log(`  Readiness:    http://${config.host}:${config.port}/ready`);
     console.log(`========================================`);
   });
 

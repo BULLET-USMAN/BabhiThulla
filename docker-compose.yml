@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bhabhi_postgres_staging
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bhabhi_user
+      POSTGRES_PASSWORD: bhabhi_secure_password
+      POSTGRES_DB: bhabhi_thulla
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_staging_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U bhabhi_user -d bhabhi_thulla']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    container_name: bhabhi_server_staging
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 3001
+      HOST: 0.0.0.0
+      NODE_ENV: staging
+      DATABASE_URL: postgresql://bhabhi_user:bhabhi_secure_password@postgres:5432/bhabhi_thulla
+      DATABASE_SSL: 'false'
+      CLIENT_ORIGIN: http://localhost:5173,http://localhost:3000
+      SESSION_SECRET: staging-session-secret-change-in-production-12345
+      GAME_STATE_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      LOG_LEVEL: info
+    ports:
+      - '3001:3001'
+
+volumes:
+  postgres_staging_data:

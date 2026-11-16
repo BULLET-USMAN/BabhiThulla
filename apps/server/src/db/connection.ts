@@ -6,6 +6,7 @@ import { drizzle, NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { newDb } from 'pg-mem';
 import * as schema from './schema.js';
 import { logger } from '../utils/logger.js';
+import { config } from '../config/index.js';
 
 const { Pool } = pg;
 
@@ -25,18 +26,21 @@ export async function initDatabase(forceInMemory = false): Promise<AppDatabase> 
     return databaseInstance;
   }
 
-  const databaseUrl = process.env.DATABASE_URL;
-  const isTest = process.env.NODE_ENV === 'test';
+  const databaseUrl = config.databaseUrl;
+  const isTest = config.isTest;
 
   if (!forceInMemory && !isTest && databaseUrl) {
     try {
       logger.info('Connecting to PostgreSQL database...', {
         url: databaseUrl.replace(/\/\/[^:]+:[^@]+@/, '//***:***@'),
+        ssl: config.databaseSsl,
+        poolSize: config.databasePoolSize,
       });
 
       const pool = new Pool({
         connectionString: databaseUrl,
-        max: parseInt(process.env.DATABASE_POOL_SIZE || '10', 10),
+        max: config.databasePoolSize,
+        ssl: config.databaseSsl ? { rejectUnauthorized: false } : undefined,
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 5000,
       });
@@ -52,6 +56,12 @@ export async function initDatabase(forceInMemory = false): Promise<AppDatabase> 
       logger.info('Connected to PostgreSQL successfully.');
       return databaseInstance;
     } catch (err: unknown) {
+      if (config.isProd) {
+        logger.error('[CRITICAL] Failed to connect to production PostgreSQL database!', {
+          error: (err as Error).message,
+        });
+        throw err;
+      }
       logger.warn('Could not connect to PostgreSQL server. Falling back to persistent in-memory database.', {
         error: (err as Error).message,
       });

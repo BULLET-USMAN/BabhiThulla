@@ -2,9 +2,11 @@ import { io, Socket } from 'socket.io-client';
 import { ActionAckResponse } from '@bhabhi/shared';
 
 function getServerUrl(): string {
-  const envUrl = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_SERVER_URL;
-  if (envUrl) {
-    return envUrl;
+  if (typeof import.meta !== 'undefined') {
+    const env = (import.meta as unknown as { env?: Record<string, string> }).env;
+    if (env?.VITE_SOCKET_URL) return env.VITE_SOCKET_URL;
+    if (env?.VITE_API_URL) return env.VITE_API_URL;
+    if (env?.VITE_SERVER_URL) return env.VITE_SERVER_URL;
   }
   if (typeof window !== 'undefined') {
     // If running in Vite dev server (port 5173 / 4173), default server is on port 3001

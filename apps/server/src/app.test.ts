@@ -14,6 +14,19 @@ describe('Server Application REST API Endpoints', () => {
     await closeDatabase();
   });
 
+  it('GET /health returns 200 with service status', async () => {
+    const res = await request(app).get('/health');
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('ok');
+    expect(res.body.service).toBe('bhabhi-thulla-server');
+  });
+
+  it('GET /ready returns 200 with operational readiness', async () => {
+    const res = await request(app).get('/ready');
+    expect(res.status).toBe(200);
+    expect(res.body.ready).toBe(true);
+  });
+
   it('GET /api/health returns 200 with service status', async () => {
     const res = await request(app).get('/api/health');
     expect(res.status).toBe(200);
@@ -30,11 +43,11 @@ describe('Server Application REST API Endpoints', () => {
     expect(typeof res.body.activeRooms).toBe('number');
   });
 
-  it('GET /api/version returns Phase 5 information', async () => {
+  it('GET /api/version returns Phase 6 information', async () => {
     const res = await request(app).get('/api/version');
     expect(res.status).toBe(200);
-    expect(res.body.version).toBe('0.5.0');
-    expect(res.body.phase).toBe(5);
+    expect(res.body.version).toBe('0.6.0');
+    expect(res.body.phase).toBe(6);
     expect(res.body.persistentStorage).toBe(true);
     expect(res.body.authoritativeStats).toBe(true);
   });

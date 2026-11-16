@@ -5,9 +5,23 @@ import {
   AvatarId,
 } from '@bhabhi/shared';
 
-const SERVER_URL =
-  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SERVER_URL) ||
-  'http://localhost:3001';
+function getApiUrl(): string {
+  if (typeof import.meta !== 'undefined') {
+    const env = (import.meta as any).env;
+    if (env?.VITE_API_URL) return env.VITE_API_URL;
+    if (env?.VITE_SERVER_URL) return env.VITE_SERVER_URL;
+  }
+  if (typeof window !== 'undefined') {
+    const { hostname, port, protocol } = window.location;
+    if (port === '5173' || port === '4173') {
+      return `${protocol}//${hostname}:3001`;
+    }
+    return window.location.origin;
+  }
+  return 'http://localhost:3001';
+}
+
+const SERVER_URL = getApiUrl();
 
 export interface GuestRegistrationResult {
   guest: {

@@ -168,6 +168,25 @@ Fully persistent, crash-recoverable game state and player history backed by Post
 
 ---
 
+## 🚀 Phase 6: Production Readiness, Security Hardening, Cloud Deployment & CI/CD
+
+### 🌐 Cloud Deployment Architecture
+- **Frontend**: Configured for continuous deployment on **Vercel** with client-side SPA routing rewrites, immutable static asset caching, and security headers ([vercel.json](file:///e:/Downloads/Projects/BhabhiThulla/vercel.json)).
+- **Backend**: Configured for high-reliability hosting on **Render** (or compatible persistent Node.js platforms) with `0.0.0.0` binding, `trust proxy` configuration, and graceful SIGTERM/SIGINT shutdown handling.
+- **Database**: Managed PostgreSQL integration with SSL support, connection pool tuning, and automated deployment migrations ([migrate.ts](file:///e:/Downloads/Projects/BhabhiThulla/apps/server/src/db/migrate.ts)).
+- **Comprehensive Documentation**:
+  - [DEPLOYMENT.md](file:///e:/Downloads/Projects/BhabhiThulla/DEPLOYMENT.md): Step-by-step cloud hosting instructions for Vercel, Render, and Managed PostgreSQL.
+  - [OPERATIONS.md](file:///e:/Downloads/Projects/BhabhiThulla/OPERATIONS.md): Operational monitoring, backup and restore procedures, and rollback plans.
+  - [SECURITY.md](file:///e:/Downloads/Projects/BhabhiThulla/SECURITY.md): Anti-cheat specifications, card privacy guarantees, and vulnerability reporting.
+
+### 🔒 Security Hardening & Observability
+- **Helmet Security Middleware**: Content Security Policy (CSP), anti-clickjacking frameguards, strict MIME sniffing protection (`nosniff`), and request body limits (64 KB).
+- **Endpoint Health Checks**: Standard `/health` (liveness) and `/ready` (dependency readiness) endpoints with latency telemetry.
+- **Startup Environment Validation**: Strict Zod-based configuration parsing preventing insecure default keys from running in production.
+- **Automated CI/CD**: Ready-to-use GitHub Actions workflow ([ci.yml](file:///e:/Downloads/Projects/BhabhiThulla/deploy/workflows/ci.yml)) testing lint, strict typechecks, unit tests, E2E browser tests, and production builds on every push and pull request.
+
+---
+
 ## 🛠️ Development & Scripts
 
 | Command | Description |
@@ -177,7 +196,7 @@ Fully persistent, crash-recoverable game state and player history backed by Post
 | `npm run build` | Compiles `@bhabhi/shared`, `@bhabhi/server`, and `@bhabhi/web` |
 | `npm run typecheck` | Validates strict TypeScript types across all workspaces |
 | `npm run lint` | Runs ESLint across all packages and apps (0 warnings, 0 errors) |
-| `npm test` | Runs all 139 unit and integration tests across 28 test suites |
+| `npm test` | Runs all 143 unit, integration, and concurrency benchmark tests |
 | `npm run test:e2e` | Runs Playwright browser tests across Desktop and Mobile viewports |
 | `npm run db:generate` | Generates Drizzle database migrations |
 | `npm run db:migrate` | Runs Drizzle migrations against the configured PostgreSQL database |
@@ -191,6 +210,7 @@ Fully persistent, crash-recoverable game state and player history backed by Post
 - [x] **Phase 3: Real-Time Online Multiplayer & Private Rooms**
 - [x] **Phase 4: Premium Gameplay Experience, Animations, Audio & Emotes**
 - [x] **Phase 5: Multiplayer Reliability, Persistent Storage, Player Statistics & Recovery**
+- [x] **Phase 6: Production Readiness, Security Hardening, Cloud Deployment & CI/CD**
 
 ---
 

@@ -1,6 +1,5 @@
 import crypto from 'crypto';
-
-const SESSION_SECRET = process.env.SESSION_SECRET || 'bhabhi-thulla-insecure-secret-change-in-prod';
+import { config } from '../config/index.js';
 
 export class GuestSessionManager {
   // Key: `${roomCode}:${playerId}` -> reconnectToken
@@ -13,7 +12,7 @@ export class GuestSessionManager {
   createSession(roomCode: string, playerId: string): string {
     const key = this.getKey(roomCode, playerId);
     const token = crypto
-      .createHmac('sha256', SESSION_SECRET)
+      .createHmac('sha256', config.sessionSecret)
       .update(key)
       .digest('hex');
 
@@ -29,7 +28,7 @@ export class GuestSessionManager {
     const key = this.getKey(roomCode, playerId);
     const expected =
       this.tokens.get(key) ||
-      crypto.createHmac('sha256', SESSION_SECRET).update(key).digest('hex');
+      crypto.createHmac('sha256', config.sessionSecret).update(key).digest('hex');
 
     if (!token || token.length !== expected.length) return false;
 

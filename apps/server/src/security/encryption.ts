@@ -1,11 +1,12 @@
 import crypto from 'crypto';
+import { config } from '../config/index.js';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12; // 96 bits standard for AES-GCM
 const DEFAULT_DEV_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
 function getEncryptionKey(overrideKey?: Buffer | string): Buffer {
-  const rawKey = overrideKey || process.env.GAME_STATE_ENCRYPTION_KEY || DEFAULT_DEV_KEY;
+  const rawKey = overrideKey || config.gameStateEncryptionKey || DEFAULT_DEV_KEY;
   if (Buffer.isBuffer(rawKey)) {
     if (rawKey.length === 32) return rawKey;
     return crypto.createHash('sha256').update(rawKey).digest();

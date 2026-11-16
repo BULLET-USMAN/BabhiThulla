@@ -145,7 +145,8 @@ export function LobbyView() {
   };
 
   const handleCopyLink = () => {
-    const inviteUrl = `${window.location.origin}/join/${activeRoomCode}`;
+    const baseUrl = ((import.meta as any).env?.VITE_PUBLIC_APP_URL || window.location.origin).replace(/\/$/, '');
+    const inviteUrl = `${baseUrl}/join/${activeRoomCode}`;
     navigator.clipboard.writeText(inviteUrl);
     setCopiedLink(true);
     addToast('Invitation link copied to clipboard!', 'success');
